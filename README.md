@@ -158,49 +158,60 @@ flowchart TD
 
 ```mermaid
 flowchart TB
-    subgraph UserInput["📝 USER INPUT"]
-        Q["What is quantum computing?"]
-    end
-    
-    subgraph DataGathering["📊 DATA GATHERING"]
-        WS["🌐 Web Search<br/>(Sources)"]
-        DOC["📄 Documents<br/>(RAG)"]
-        HIST["💬 Conversation<br/>History (Context)"]
-    end
-    
-    subgraph LLMBrain["🧠 LLM - Brain"]
-        L1["Understands question"]
-        L2["Processes data"]
-        L3["Generates response"]
-        L4["Remembers context"]
-        L5["Synthesizes sources"]
-    end
-    
-    subgraph Response["💡 INTELLIGENT RESPONSE"]
-        R["Quantum computing uses qubits<br/>instead of classical bits..."]
-    end
-    
-    Q --> WS
-    Q --> DOC
-    Q --> HIST
-    
-    WS --> LLMBrain
-    DOC --> LLMBrain
-    HIST --> LLMBrain
-    
-    LLMBrain --> R
+    A["📝 USER INPUT"] --> B["📊 DATA GATHERING"]
+    B --> C["🧠 LLM - Brain"]
+    C --> D["💡 INTELLIGENT RESPONSE"]
 ```
 
-**LLM Capabilities:**
+<table>
+<tr>
+<td width="100%">
 
-| Capability | Description |
-|------------|-------------|
-| **Intelligent Responses** | Generates natural, context-aware answers to user questions |
-| **Context Understanding** | Maintains conversation memory across chat sessions |
-| **Web Result Synthesis** | Summarizes and extracts relevant info from web search results |
-| **Document Q&A** | Answers questions based on uploaded PDF/document content |
-| **Title Generation** | Auto-generates meaningful titles for chat sessions |
-| **On-Device Processing** | All processing happens locally for privacy |
+**📝 USER INPUT**
+```
+"What is quantum computing?"
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+**📊 DATA GATHERING**
+| Source | Description |
+|--------|-------------|
+| 🌐 Web Search | Real-time search results from DuckDuckGo |
+| 📄 Documents | Your uploaded PDFs and files (RAG) |
+| 💬 Chat History | Previous conversation context |
+
+</td>
+</tr>
+<tr>
+<td>
+
+**🧠 LLM (Brain) - What it does:**
+- Understands the question
+- Processes all gathered data
+- Generates intelligent, coherent response
+- Remembers conversation context
+- Synthesizes information from multiple sources
+
+</td>
+</tr>
+<tr>
+<td>
+
+**💡 INTELLIGENT RESPONSE**
+```
+"Quantum computing uses quantum mechanics principles like superposition 
+and entanglement to process information. Unlike classical computers 
+that use bits (0 or 1), quantum computers use qubits which can exist 
+in multiple states simultaneously..."
+```
+
+</td>
+</tr>
+</table>
 
 > **Note**: Without Apple Intelligence (e.g., on simulator), the app displays raw web search results as a fallback instead of synthesized responses.
 

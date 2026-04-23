@@ -41,30 +41,32 @@ A privacy-focused AI chat assistant for iOS, powered by **Apple Intelligence (Fo
 
 This project follows **Clean Architecture** principles with **MVVM** pattern:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      PRESENTATION LAYER                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   SwiftUI   │  │  ViewModels │  │      Components         │  │
-│  │    Views    │◄─┤  (MVVM)     │  │  (ChatBubble, etc.)     │  │
-│  └─────────────┘  └──────┬──────┘  └─────────────────────────┘  │
-└──────────────────────────┼──────────────────────────────────────┘
-                           │
-┌──────────────────────────┼──────────────────────────────────────┐
-│                      DOMAIN LAYER                               │
-│  ┌─────────────┐  ┌──────┴──────┐  ┌─────────────────────────┐  │
-│  │  Entities   │  │  Use Cases  │  │  Repository Protocols   │  │
-│  │  (Models)   │  │  (Business) │  │     (Interfaces)        │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-┌──────────────────────────┼──────────────────────────────────────┐
-│                       DATA LAYER                                │
-│  ┌─────────────┐  ┌──────┴──────┐  ┌─────────────────────────┐  │
-│  │Repositories │  │ DataSources │  │    DTOs & Mappers       │  │
-│  │  (Impl)     │  │ (DB, API)   │  │                         │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Presentation["🎨 PRESENTATION LAYER"]
+        Views["SwiftUI Views"]
+        ViewModels["ViewModels (MVVM)"]
+        Components["Components<br/>(ChatBubble, etc.)"]
+        Views <--> ViewModels
+    end
+    
+    subgraph Domain["⚙️ DOMAIN LAYER"]
+        Entities["Entities<br/>(Models)"]
+        UseCases["Use Cases<br/>(Business Logic)"]
+        Protocols["Repository<br/>Protocols"]
+    end
+    
+    subgraph Data["💾 DATA LAYER"]
+        Repos["Repositories<br/>(Implementations)"]
+        DataSources["DataSources<br/>(DB, API)"]
+        DTOs["DTOs & Mappers"]
+    end
+    
+    ViewModels --> UseCases
+    UseCases --> Protocols
+    Protocols -.-> Repos
+    Repos --> DataSources
+    Repos --> DTOs
 ```
 
 ### Project Structure
@@ -133,46 +135,23 @@ letstalkAI/
 
 ### AI Response Flow
 
-```
-User Question
-      │
-      ▼
-┌─────────────────┐
-│  Check Mode     │
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
-┌───────┐ ┌───────────┐ ┌──────────┐
-│General│ │Web Search │ │ RAG Mode │
-│ Mode  │ │   Mode    │ │(Documents│
-└───┬───┘ └─────┬─────┘ └────┬─────┘
-    │           │            │
-    │     ┌─────┴─────┐      │
-    │     │ Fetch Web │      │
-    │     │  Results  │      │
-    │     └─────┬─────┘      │
-    │           │            │
-    └───────────┼────────────┘
-                │
-                ▼
-        ┌───────────────┐
-        │  Build Prompt │
-        │  with Context │
-        └───────┬───────┘
-                │
-                ▼
-        ┌───────────────┐
-        │ Apple Intel-  │
-        │ ligence (LLM) │
-        └───────┬───────┘
-                │
-                ▼
-        ┌───────────────┐
-        │   Response    │
-        │  + Sources    │
-        └───────────────┘
+```mermaid
+flowchart TD
+    A[User Question] --> B{Check Mode}
+    
+    B --> C[General Mode]
+    B --> D[Web Search Mode]
+    B --> E[RAG Mode]
+    
+    D --> F[Fetch Web Results]
+    E --> G[Query Vector DB]
+    
+    C --> H[Build Prompt with Context]
+    F --> H
+    G --> H
+    
+    H --> I[Apple Intelligence LLM]
+    I --> J[Response + Sources]
 ```
 
 ### Key Components

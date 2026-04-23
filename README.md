@@ -168,16 +168,16 @@ flowchart TB
         HIST["💬 Conversation<br/>History (Context)"]
     end
     
-    subgraph LLMBrain["🧠 LLM (Brain)"]
-        L1["• Understands the question"]
-        L2["• Processes all gathered data"]
-        L3["• Generates intelligent response"]
-        L4["• Remembers conversation context"]
-        L5["• Synthesizes from multiple sources"]
+    subgraph LLMBrain["🧠 LLM - Brain"]
+        L1["Understands question"]
+        L2["Processes data"]
+        L3["Generates response"]
+        L4["Remembers context"]
+        L5["Synthesizes sources"]
     end
     
     subgraph Response["💡 INTELLIGENT RESPONSE"]
-        R["Quantum computing uses quantum mechanics<br/>principles like superposition and entanglement<br/>to process information. Unlike classical computers<br/>that use bits (0 or 1), quantum computers use qubits..."]
+        R["Quantum computing uses qubits<br/>instead of classical bits..."]
     end
     
     Q --> WS

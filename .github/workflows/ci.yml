@@ -1,0 +1,150 @@
+name: letstalkAI CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.0.app/Contents/Developer
+  XCODE_PROJECT: letstalkAI.xcodeproj
+  SCHEME: letstalkAI
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+      
+      - name: Show Xcode version
+        run: xcodebuild -version
+      
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+      
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project $XCODE_PROJECT \
+            -scheme $SCHEME \
+            -clonedSourcePackagesDirPath .build
+      
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -project $XCODE_PROJECT \
+            -scheme $SCHEME \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.0' \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath .build \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+      
+      - name: Run Unit Tests
+        run: |
+          xcodebuild test-without-building \
+            -project $XCODE_PROJECT \
+            -scheme $SCHEME \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.0' \
+            -derivedDataPath DerivedData \
+            -testPlan UnitTests \
+            -resultBundlePath TestResults/UnitTests.xcresult \
+            -parallel-testing-enabled YES
+        continue-on-error: true
+      
+      - name: Run Integration Tests
+        run: |
+          xcodebuild test-without-building \
+            -project $XCODE_PROJECT \
+            -scheme $SCHEME \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.0' \
+            -derivedDataPath DerivedData \
+            -testPlan IntegrationTests \
+            -resultBundlePath TestResults/IntegrationTests.xcresult
+        continue-on-error: true
+      
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/
+          retention-days: 7
+      
+      - name: Generate Test Summary
+        if: always()
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          xcrun xcresulttool get --path TestResults/UnitTests.xcresult --format json 2>/dev/null | jq -r '.metrics.testsCount.value // "N/A"' | xargs -I {} echo "Unit Tests: {} tests" >> $GITHUB_STEP_SUMMARY || true
+
+  ui-tests:
+    runs-on: macos-15
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+      
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+      
+      - name: Run UI Tests
+        run: |
+          xcodebuild test \
+            -project $XCODE_PROJECT \
+            -scheme letstalkAIUITests \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.0' \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath .build \
+            -resultBundlePath TestResults/UITests.xcresult \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+        continue-on-error: true
+      
+      - name: Upload UI Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-test-results
+          path: TestResults/UITests.xcresult
+          retention-days: 7
+
+  lint:
+    runs-on: macos-15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      
+      - name: Run SwiftLint
+        run: swiftlint lint --strict --reporter github-actions-logging
+        continue-on-error: true

@@ -157,36 +157,38 @@ flowchart TD
 ### What the LLM (Apple Intelligence) Does
 
 ```mermaid
-flowchart LR
-    subgraph Input["📥 INPUT"]
-        Q[User Question]
-        WS[Web Search Results]
-        DOC[Document Context]
-        HIST[Chat History]
+flowchart TB
+    subgraph UserInput["📝 USER INPUT"]
+        Q["What is quantum computing?"]
     end
     
-    subgraph LLM["🧠 APPLE INTELLIGENCE"]
-        direction TB
-        UNDERSTAND[Understand Intent]
-        REASON[Reasoning & Analysis]
-        GENERATE[Generate Response]
-        UNDERSTAND --> REASON --> GENERATE
+    subgraph DataGathering["📊 DATA GATHERING"]
+        WS["🌐 Web Search<br/>(Sources)"]
+        DOC["📄 Documents<br/>(RAG)"]
+        HIST["💬 Conversation<br/>History (Context)"]
     end
     
-    subgraph Output["📤 OUTPUT"]
-        RESP[Intelligent Response]
-        TITLE[Session Title]
-        SUMMARY[Contextual Summary]
+    subgraph LLMBrain["🧠 LLM (Brain)"]
+        L1["• Understands the question"]
+        L2["• Processes all gathered data"]
+        L3["• Generates intelligent response"]
+        L4["• Remembers conversation context"]
+        L5["• Synthesizes from multiple sources"]
     end
     
-    Q --> LLM
-    WS --> LLM
-    DOC --> LLM
-    HIST --> LLM
+    subgraph Response["💡 INTELLIGENT RESPONSE"]
+        R["Quantum computing uses quantum mechanics<br/>principles like superposition and entanglement<br/>to process information. Unlike classical computers<br/>that use bits (0 or 1), quantum computers use qubits..."]
+    end
     
-    LLM --> RESP
-    LLM --> TITLE
-    LLM --> SUMMARY
+    Q --> WS
+    Q --> DOC
+    Q --> HIST
+    
+    WS --> LLMBrain
+    DOC --> LLMBrain
+    HIST --> LLMBrain
+    
+    LLMBrain --> R
 ```
 
 **LLM Capabilities:**

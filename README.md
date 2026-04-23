@@ -154,6 +154,54 @@ flowchart TD
     I --> J[Response + Sources]
 ```
 
+### What the LLM (Apple Intelligence) Does
+
+```mermaid
+flowchart LR
+    subgraph Input["📥 INPUT"]
+        Q[User Question]
+        WS[Web Search Results]
+        DOC[Document Context]
+        HIST[Chat History]
+    end
+    
+    subgraph LLM["🧠 APPLE INTELLIGENCE"]
+        direction TB
+        UNDERSTAND[Understand Intent]
+        REASON[Reasoning & Analysis]
+        GENERATE[Generate Response]
+        UNDERSTAND --> REASON --> GENERATE
+    end
+    
+    subgraph Output["📤 OUTPUT"]
+        RESP[Intelligent Response]
+        TITLE[Session Title]
+        SUMMARY[Contextual Summary]
+    end
+    
+    Q --> LLM
+    WS --> LLM
+    DOC --> LLM
+    HIST --> LLM
+    
+    LLM --> RESP
+    LLM --> TITLE
+    LLM --> SUMMARY
+```
+
+**LLM Capabilities:**
+
+| Capability | Description |
+|------------|-------------|
+| **Intelligent Responses** | Generates natural, context-aware answers to user questions |
+| **Context Understanding** | Maintains conversation memory across chat sessions |
+| **Web Result Synthesis** | Summarizes and extracts relevant info from web search results |
+| **Document Q&A** | Answers questions based on uploaded PDF/document content |
+| **Title Generation** | Auto-generates meaningful titles for chat sessions |
+| **On-Device Processing** | All processing happens locally for privacy |
+
+> **Note**: Without Apple Intelligence (e.g., on simulator), the app displays raw web search results as a fallback instead of synthesized responses.
+
 ### Key Components
 
 | Component | Technology | Purpose |

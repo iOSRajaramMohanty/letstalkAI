@@ -7,46 +7,34 @@
 
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
+
 struct SettingsView: View {
     @StateObject var viewModel: SettingsViewModel
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        List {
-            Section {
-                appInfoHeader
-            }
-            
-            Section("Appearance") {
-                colorSchemePicker
-            }
-            
-            Section("Links") {
-                linkRow(title: "GitHub", icon: "chevron.left.forwardslash.chevron.right", url: viewModel.githubURL)
-                linkRow(title: "Discord", icon: "message.fill", url: viewModel.discordURL)
-                linkRow(title: "Privacy Policy", icon: "hand.raised.fill", url: viewModel.privacyURL)
-                linkRow(title: "Terms of Service", icon: "doc.text.fill", url: viewModel.termsURL)
-            }
-            
-            Section("About") {
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text("\(viewModel.appVersion) (\(viewModel.buildNumber))")
-                        .foregroundStyle(.secondary)
-                }
+        ScrollView {
+            VStack(spacing: 24) {
+                appHeader
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("letstalkAI")
-                        .font(.headline)
-                    
-                    Text("Powered by Apple Foundation Models. All AI processing happens on your device for maximum privacy.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
+                appearanceSection
+                
+                helpSection
+                
+                communitySection
+                
+                legalSection
+                
+                versionFooter
             }
+            .padding()
         }
+        .background(backgroundColor.ignoresSafeArea())
         .navigationTitle("Settings")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -55,6 +43,7 @@ struct SettingsView: View {
                 Button("Done") {
                     dismiss()
                 }
+                .fontWeight(.semibold)
             }
         }
         #elseif os(macOS)
@@ -65,41 +54,245 @@ struct SettingsView: View {
                 }
             }
         }
+        .frame(minWidth: 450, minHeight: 600)
         #endif
         .preferredColorScheme(viewModel.colorScheme)
-        #if os(macOS)
-        .frame(minWidth: 400, minHeight: 400)
+    }
+    
+    private var backgroundColor: Color {
+        #if os(iOS)
+        Color(.systemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
         #endif
     }
     
-    private var appInfoHeader: some View {
-        HStack(spacing: 16) {
-            DynamicLogoView()
-                .frame(width: 80, height: 80)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("letstalkAI")
-                    .font(.title)
-                    .fontWeight(.bold)
+    // MARK: - App Header
+    
+    private var appHeader: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.white)
+                    .frame(width: 100, height: 100)
+                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
                 
-                Text("Your Private AI Assistant")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 50))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
+            
+            Text("letstalkAI")
+                .font(.title)
+                .fontWeight(.bold)
+            
+            Text("Private On-Device AI")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 20)
     }
     
-    private var colorSchemePicker: some View {
-        Picker("Color Scheme", selection: Binding(
-            get: { colorSchemeOption },
-            set: { viewModel.setColorScheme($0.colorScheme) }
-        )) {
-            ForEach(ColorSchemeOption.allCases) { option in
-                Text(option.rawValue).tag(option)
+    // MARK: - Appearance Section
+    
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Appearance")
+            
+            VStack(spacing: 0) {
+                HStack {
+                    settingsIcon("paintpalette.fill", color: .blue)
+                    
+                    Text("Color Scheme")
+                        .font(.body)
+                    
+                    Spacer()
+                    
+                    Picker("", selection: Binding(
+                        get: { colorSchemeOption },
+                        set: { viewModel.setColorScheme($0.colorScheme) }
+                    )) {
+                        ForEach(ColorSchemeOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(.blue)
+                }
+                .padding()
+                .background(cardBackground)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .pickerStyle(.segmented)
+    }
+    
+    // MARK: - Help Section
+    
+    private var helpSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Help & Tutorial")
+            
+            VStack(spacing: 0) {
+                settingsLinkRow(
+                    icon: "graduationcap.fill",
+                    iconColor: .purple,
+                    title: "View Tutorial",
+                    showChevron: true
+                ) {
+                    // TODO: Show tutorial
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+    
+    // MARK: - Community Section
+    
+    private var communitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Community & Support")
+            
+            VStack(spacing: 0) {
+                settingsLinkRow(
+                    icon: "chevron.left.forwardslash.chevron.right",
+                    iconColor: .gray,
+                    title: "GitHub",
+                    showExternalLink: true
+                ) {
+                    viewModel.openURL(viewModel.githubURL)
+                }
+                
+                Divider()
+                    .padding(.leading, 56)
+                
+                settingsLinkRow(
+                    icon: "bubble.left.and.bubble.right.fill",
+                    iconColor: .indigo,
+                    title: "Discord",
+                    showExternalLink: true
+                ) {
+                    viewModel.openURL(viewModel.discordURL)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+    
+    // MARK: - Legal Section
+    
+    private var legalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Legal")
+            
+            VStack(spacing: 0) {
+                settingsLinkRow(
+                    icon: "hand.raised.fill",
+                    iconColor: .blue,
+                    title: "Privacy Policy",
+                    showExternalLink: true
+                ) {
+                    viewModel.openURL(viewModel.privacyURL)
+                }
+                
+                Divider()
+                    .padding(.leading, 56)
+                
+                settingsLinkRow(
+                    icon: "doc.text.fill",
+                    iconColor: .green,
+                    title: "Terms of Service",
+                    showExternalLink: true
+                ) {
+                    viewModel.openURL(viewModel.termsURL)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+    
+    // MARK: - Version Footer
+    
+    private var versionFooter: some View {
+        VStack(spacing: 4) {
+            Text("Version \(viewModel.appVersion) (\(viewModel.buildNumber))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            Text("Powered by Apple Intelligence")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.top, 20)
+    }
+    
+    // MARK: - Helper Views
+    
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.horizontal, 4)
+    }
+    
+    private func settingsIcon(_ systemName: String, color: Color) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 18))
+            .foregroundStyle(.white)
+            .frame(width: 32, height: 32)
+            .background(color)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+    
+    private func settingsLinkRow(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        showChevron: Bool = false,
+        showExternalLink: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack {
+                settingsIcon(icon, color: iconColor)
+                
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+                
+                if showChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                
+                if showExternalLink {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding()
+            .background(cardBackground)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var cardBackground: some View {
+        #if os(iOS)
+        Color(.secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
     }
     
     private var colorSchemeOption: ColorSchemeOption {
@@ -107,23 +300,6 @@ struct SettingsView: View {
             return scheme == .light ? .light : .dark
         }
         return .system
-    }
-    
-    private func linkRow(title: String, icon: String, url: String) -> some View {
-        Button {
-            viewModel.openURL(url)
-        } label: {
-            HStack {
-                Label(title, systemImage: icon)
-                    .foregroundStyle(.primary)
-                
-                Spacer()
-                
-                Image(systemName: "arrow.up.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 }
 
@@ -143,5 +319,11 @@ enum ColorSchemeOption: String, CaseIterable, Identifiable {
         case .dark:
             return .dark
         }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        SettingsView(viewModel: SettingsViewModel())
     }
 }

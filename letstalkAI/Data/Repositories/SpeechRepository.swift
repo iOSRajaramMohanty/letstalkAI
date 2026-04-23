@@ -3,12 +3,18 @@
 //  letstalkAI
 //
 //  Data Layer Repository Implementation for Speech services
+//  Cross-platform (iOS/macOS)
 //
 
 import Foundation
 import Speech
 import AVFoundation
+
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
     private var speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
@@ -19,6 +25,11 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
     private var speechSynthesizer = AVSpeechSynthesizer()
     private var speechDelegate: SpeechDelegateHandler?
     
+    #if os(macOS)
+    private var nsSpeechSynthesizer: NSSpeechSynthesizer?
+    private var macSpeechDelegate: MacSpeechDelegateHandler?
+    #endif
+    
     private var _isRecording = false
     private var _isSpeaking = false
     private var _recognizedText = ""
@@ -28,15 +39,27 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
     private var continuousMode = false
     private var onAutoStopCallback: (() -> Void)?
     
+    #if os(iOS)
     private var feedbackGenerator: UIImpactFeedbackGenerator?
+    #endif
     
     var isRecording: Bool { _isRecording }
-    var isSpeaking: Bool { speechSynthesizer.isSpeaking }
+    var isSpeaking: Bool { 
+        #if os(iOS)
+        return speechSynthesizer.isSpeaking
+        #elseif os(macOS)
+        return nsSpeechSynthesizer?.isSpeaking ?? speechSynthesizer.isSpeaking
+        #endif
+    }
     var recognizedText: String { _recognizedText }
     var currentSpeakingText: String { _currentSpeakingText }
     
     init() {
+        #if os(iOS)
         feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+        #elseif os(macOS)
+        nsSpeechSynthesizer = NSSpeechSynthesizer()
+        #endif
     }
     
     func requestPermissions() async -> Bool {
@@ -50,9 +73,27 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
             return false
         }
         
+        #if os(iOS)
         let audioStatus = await AVAudioApplication.requestRecordPermission()
         return audioStatus
+        #elseif os(macOS)
+        let audioStatus = await requestMicrophonePermission()
+        return audioStatus
+        #endif
     }
+    
+    #if os(macOS)
+    private func requestMicrophonePermission() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return true
+        case .notDetermined:
+            return await AVCaptureDevice.requestAccess(for: .audio)
+        default:
+            return false
+        }
+    }
+    #endif
     
     func startRecording() async throws {
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
@@ -66,9 +107,11 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
         
         cancelPreviousTask()
         
+        #if os(iOS)
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
         try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        #endif
         
         let inputNode = audioEngine.inputNode
         
@@ -80,10 +123,16 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
         recognitionRequest.shouldReportPartialResults = true
         recognitionRequest.taskHint = .dictation
         
+        #if os(iOS)
         await MainActor.run {
             feedbackGenerator?.prepare()
             feedbackGenerator?.impactOccurred()
         }
+        #elseif os(macOS)
+        await MainActor.run {
+            HapticFeedback.medium.trigger()
+        }
+        #endif
         
         recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
@@ -159,7 +208,11 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
         _isRecording = false
         
         Task { @MainActor in
+            #if os(iOS)
             feedbackGenerator?.impactOccurred()
+            #elseif os(macOS)
+            HapticFeedback.medium.trigger()
+            #endif
         }
         
         if continuousMode {
@@ -186,6 +239,15 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
         
         _currentSpeakingText = text
         
+        #if os(iOS)
+        await speakiOS(text, completion: completion)
+        #elseif os(macOS)
+        await speakMacOS(text, completion: completion)
+        #endif
+    }
+    
+    #if os(iOS)
+    private func speakiOS(_ text: String, completion: @escaping @Sendable () -> Void) async {
         let audioSession = AVAudioSession.sharedInstance()
         do {
             try audioSession.setCategory(.playback, mode: .default)
@@ -211,14 +273,38 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
             self.speechSynthesizer.speak(utterance)
         }
     }
+    #endif
+    
+    #if os(macOS)
+    private func speakMacOS(_ text: String, completion: @escaping @Sendable () -> Void) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let handler = MacSpeechDelegateHandler(onFinish: {
+                completion()
+                continuation.resume()
+            })
+            
+            self.macSpeechDelegate = handler
+            self.nsSpeechSynthesizer?.delegate = handler
+            self.nsSpeechSynthesizer?.startSpeaking(text)
+        }
+    }
+    #endif
     
     func stopSpeaking() {
+        #if os(iOS)
         if speechSynthesizer.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
         }
+        #elseif os(macOS)
+        if nsSpeechSynthesizer?.isSpeaking == true {
+            nsSpeechSynthesizer?.stopSpeaking()
+        }
+        #endif
         _currentSpeakingText = ""
     }
 }
+
+// MARK: - iOS Speech Delegate
 
 private final class SpeechDelegateHandler: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
     let onFinish: () -> Void
@@ -235,3 +321,19 @@ private final class SpeechDelegateHandler: NSObject, AVSpeechSynthesizerDelegate
         onFinish()
     }
 }
+
+// MARK: - macOS Speech Delegate
+
+#if os(macOS)
+private final class MacSpeechDelegateHandler: NSObject, NSSpeechSynthesizerDelegate, @unchecked Sendable {
+    let onFinish: () -> Void
+    
+    init(onFinish: @escaping () -> Void) {
+        self.onFinish = onFinish
+    }
+    
+    func speechSynthesizer(_ sender: NSSpeechSynthesizer, didFinishSpeaking finishedSpeaking: Bool) {
+        onFinish()
+    }
+}
+#endif

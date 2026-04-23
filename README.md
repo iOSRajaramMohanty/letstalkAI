@@ -1,11 +1,16 @@
 # letstalkAI
 
-A privacy-focused AI chat assistant for iOS, powered by **Apple Intelligence (FoundationModels)**. All AI processing happens on-device for maximum privacy and security.
+A privacy-focused AI chat assistant for **iOS & macOS**, powered by **Apple Intelligence (FoundationModels)**. All AI processing happens on-device for maximum privacy and security.
+
+[![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS-blue.svg)](https://developer.apple.com)
+[![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Features
 
 ### Core Features
-- **On-Device AI** - Powered by Apple FoundationModels (iOS 26+), all AI processing happens locally
+- **On-Device AI** - Powered by Apple FoundationModels, all AI processing happens locally
+- **Cross-Platform** - Native support for both iOS and macOS
 - **RAG (Retrieval-Augmented Generation)** - Upload PDFs and documents for context-aware responses
 - **Web Search Integration** - Real-time web search using DuckDuckGo with source citations
 - **Voice Conversations** - Full speech-to-text (STT) and text-to-speech (TTS) support
@@ -17,16 +22,28 @@ A privacy-focused AI chat assistant for iOS, powered by **Apple Intelligence (Fo
 - **Markdown Rendering** - Rich text formatting in AI responses
 - **Listen Button** - Text-to-speech for any AI message
 - **Source Citations** - View and open web sources directly
-- **Haptic Feedback** - Tactile feedback for interactions
+- **Haptic Feedback** - Tactile feedback for interactions (iOS & macOS trackpad)
+- **Native Experience** - Platform-specific optimizations for iOS and macOS
 
 ## System Requirements
 
+### iOS
+
 | Requirement | Minimum |
 |-------------|---------|
-| iOS Version | 26.0+ |
+| iOS Version | 18.0+ (26.0+ for FoundationModels) |
 | Xcode | 16.0+ |
 | Swift | 6.0+ |
 | Device | iPhone 15 Pro or newer (for Apple Intelligence) |
+
+### macOS
+
+| Requirement | Minimum |
+|-------------|---------|
+| macOS Version | 15.0 Sequoia+ (26.0+ for FoundationModels) |
+| Xcode | 16.0+ |
+| Swift | 6.0+ |
+| Hardware | Apple Silicon Mac (M1, M2, M3, M4 or newer) |
 
 ### Important Notes
 
@@ -35,7 +52,7 @@ A privacy-focused AI chat assistant for iOS, powered by **Apple Intelligence (Fo
 > - Web search will show raw results without summarization
 > - Conversation memory/context is not available
 > 
-> **Simulator Limitation**: Apple Intelligence is NOT available on iOS Simulator. You must test on a physical device with Apple Intelligence enabled.
+> **Simulator Limitation**: Apple Intelligence is NOT available on iOS Simulator or macOS without Apple Silicon. You must test on a physical device with Apple Intelligence enabled.
 
 ## Architecture
 
@@ -240,14 +257,15 @@ in multiple states simultaneously..."
 ### Prerequisites
 
 1. **Xcode 16+** installed
-2. **iOS 26+ device** with Apple Intelligence enabled
-3. **Apple Developer Account** (for device deployment)
+2. **Apple Developer Account** (for device deployment)
+3. **For iOS**: iPhone 15 Pro or newer with Apple Intelligence enabled
+4. **For macOS**: Apple Silicon Mac (M1+) with Apple Intelligence enabled
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/letstalkAI.git
+   git clone https://github.com/iOSRajaramMohanty/letstalkAI.git
    cd letstalkAI
    ```
 
@@ -260,6 +278,26 @@ in multiple states simultaneously..."
    ```bash
    open letstalkAI.xcodeproj
    ```
+
+### Building for iOS
+
+1. Select the **letstalkAI** scheme
+2. Choose your iOS device (not simulator)
+3. Press `Cmd+R` to build and run
+
+### Building for macOS
+
+1. Select the **letstalkAI-macOS** scheme
+2. Press `Cmd+R` to build and run
+
+### Available Schemes
+
+| Scheme | Platform | Description |
+|--------|----------|-------------|
+| `letstalkAI` | iOS | Main iOS app |
+| `letstalkAI-macOS` | macOS | Native macOS app |
+| `letstalkAITests` | iOS | Unit tests for iOS |
+| `letstalkAITests-macOS` | macOS | Unit tests for macOS |
 
 4. **Configure signing**
    - Select the `letstalkAI` target

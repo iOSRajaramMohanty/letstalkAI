@@ -2,10 +2,14 @@
 //  HapticFeedback.swift
 //  letstalkAI
 //
-//  Haptic feedback utility
+//  Haptic feedback utility - Cross-platform (iOS/macOS)
 //
 
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 enum HapticFeedback: Sendable {
     case light
@@ -17,6 +21,15 @@ enum HapticFeedback: Sendable {
     case selection
     
     func trigger() {
+        #if os(iOS)
+        triggerIOS()
+        #elseif os(macOS)
+        triggerMacOS()
+        #endif
+    }
+    
+    #if os(iOS)
+    private func triggerIOS() {
         switch self {
         case .light:
             let generator = UIImpactFeedbackGenerator(style: .light)
@@ -54,4 +67,29 @@ enum HapticFeedback: Sendable {
             generator.selectionChanged()
         }
     }
+    #endif
+    
+    #if os(macOS)
+    private func triggerMacOS() {
+        switch self {
+        case .light, .medium, .heavy, .selection:
+            NSHapticFeedbackManager.defaultPerformer.perform(
+                .generic,
+                performanceTime: .default
+            )
+            
+        case .success:
+            NSHapticFeedbackManager.defaultPerformer.perform(
+                .levelChange,
+                performanceTime: .default
+            )
+            
+        case .warning, .error:
+            NSHapticFeedbackManager.defaultPerformer.perform(
+                .alignment,
+                performanceTime: .default
+            )
+        }
+    }
+    #endif
 }

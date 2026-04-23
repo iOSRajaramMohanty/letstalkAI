@@ -2,7 +2,7 @@
 //  VoiceConversationView.swift
 //  letstalkAI
 //
-//  Full-screen voice conversation interface
+//  Full-screen voice conversation interface - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
@@ -40,6 +40,9 @@ struct VoiceConversationView: View {
                 closeButton
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 400, minHeight: 500)
+        #endif
         .onAppear {
             if let session = session {
                 viewModel.setSession(session)
@@ -67,7 +70,7 @@ struct VoiceConversationView: View {
     private var gradientColors: [Color] {
         switch viewModel.conversationState {
         case .idle:
-            return [Color(.systemBackground), Color(.systemGray6)]
+            return [backgroundColor, secondaryBackgroundColor]
         case .listening:
             return [.blue.opacity(0.3), .purple.opacity(0.3)]
         case .processing:
@@ -75,6 +78,22 @@ struct VoiceConversationView: View {
         case .speaking:
             return [.green.opacity(0.3), .cyan.opacity(0.3)]
         }
+    }
+    
+    private var backgroundColor: Color {
+        #if os(iOS)
+        Color(.systemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+    
+    private var secondaryBackgroundColor: Color {
+        #if os(iOS)
+        Color(.systemGray6)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
     }
     
     private var visualizer: some View {
@@ -192,6 +211,7 @@ struct VoiceConversationView: View {
                 }
                 .shadow(color: controlButtonColor.opacity(0.5), radius: 10)
         }
+        .buttonStyle(.plain)
         .disabled(!hasPermission)
     }
     
@@ -257,6 +277,7 @@ struct VoiceConversationView: View {
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
                 .padding()
             }
             

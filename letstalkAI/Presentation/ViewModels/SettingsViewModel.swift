@@ -2,11 +2,17 @@
 //  SettingsViewModel.swift
 //  letstalkAI
 //
-//  Presentation Layer ViewModel for Settings
+//  Presentation Layer ViewModel for Settings - Cross-platform (iOS/macOS)
 //
 
 import Foundation
 import SwiftUI
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
@@ -52,11 +58,16 @@ final class SettingsViewModel: ObservableObject {
     
     func openURL(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
+        
+        #if os(iOS)
         UIApplication.shared.open(url)
+        #elseif os(macOS)
+        NSWorkspace.shared.open(url)
+        #endif
     }
     
     var githubURL: String {
-        "https://github.com/letstalkAI"
+        "https://github.com/iOSRajaramMohanty/letstalkAI"
     }
     
     var discordURL: String {

@@ -2,7 +2,7 @@
 //  ChatView.swift
 //  letstalkAI
 //
-//  Main chat interface view
+//  Main chat interface view - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
@@ -29,6 +29,7 @@ struct ChatView: View {
                 inputBar
             }
             .navigationTitle(viewModel.currentSession?.displayTitle ?? "letstalkAI")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -55,6 +56,20 @@ struct ChatView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    webSearchToggle
+                    
+                    Button {
+                        showKnowledgeBase = true
+                    } label: {
+                        Image(systemName: "doc.badge.plus")
+                            .imageScale(.large)
+                    }
+                }
+            }
+            #endif
         }
         .onChange(of: viewModel.currentSession) { _, session in
             if let session = session {
@@ -101,7 +116,9 @@ struct ChatView: View {
                 }
                 .padding()
             }
+            #if os(iOS)
             .scrollDismissesKeyboard(.interactively)
+            #endif
             .onChange(of: viewModel.messages.count) { _, _ in
                 withAnimation {
                     if let lastId = viewModel.messages.last?.id {
@@ -129,7 +146,7 @@ struct ChatView: View {
                     .padding(.vertical, 12)
                     .background(
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(.systemGray6))
+                            .fill(inputBackgroundColor)
                     )
                     .focused($textFieldFocus)
                 
@@ -141,8 +158,9 @@ struct ChatView: View {
                             .font(.system(size: 20))
                             .foregroundStyle(.blue)
                             .frame(width: 44, height: 44)
-                            .background(Circle().fill(Color(.systemGray6)))
+                            .background(Circle().fill(inputBackgroundColor))
                     }
+                    .buttonStyle(.plain)
                     
                     Button {
                         sendMessage()
@@ -151,6 +169,7 @@ struct ChatView: View {
                             .font(.system(size: 36))
                             .foregroundStyle(messageText.isEmpty ? .gray : .blue)
                     }
+                    .buttonStyle(.plain)
                     .disabled(messageText.isEmpty || viewModel.isLoading)
                 }
             }
@@ -158,6 +177,14 @@ struct ChatView: View {
             .padding(.vertical, 12)
             .background(.ultraThinMaterial)
         }
+    }
+    
+    private var inputBackgroundColor: Color {
+        #if os(iOS)
+        Color(.systemGray6)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
     }
     
     private var webSearchToggle: some View {

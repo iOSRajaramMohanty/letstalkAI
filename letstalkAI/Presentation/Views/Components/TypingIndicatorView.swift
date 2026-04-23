@@ -2,7 +2,7 @@
 //  TypingIndicatorView.swift
 //  letstalkAI
 //
-//  Typing indicator with streaming text
+//  Typing indicator with streaming text - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
@@ -29,11 +29,19 @@ struct TypingIndicatorView: View {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemGray6))
+                    .fill(bubbleBackgroundColor)
             )
             
             Spacer(minLength: 60)
         }
+    }
+    
+    private var bubbleBackgroundColor: Color {
+        #if os(iOS)
+        Color(.systemGray6)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
     }
     
     private var aiAvatar: some View {

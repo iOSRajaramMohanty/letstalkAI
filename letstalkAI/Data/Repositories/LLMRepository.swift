@@ -3,6 +3,7 @@
 //  letstalkAI
 //
 //  Data Layer Repository Implementation using Apple FoundationModels
+//  Cross-platform (iOS/macOS)
 //
 
 import Foundation
@@ -20,7 +21,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
     
     func getOrCreateSession(sessionId: String) async {
         #if canImport(FoundationModels)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, *) {
             await LLMSessionStore.shared.createSession(sessionId)
         }
         #endif
@@ -37,7 +38,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                 self.respondingState = true
                 
                 #if canImport(FoundationModels)
-                if #available(iOS 26.0, *) {
+                if #available(iOS 26.0, macOS 26.0, *) {
                     do {
                         try await LLMSessionStore.shared.streamResponse(
                             prompt: prompt,
@@ -55,7 +56,11 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                     }
                 } else {
                     self.respondingState = false
+                    #if os(iOS)
                     continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence requires iOS 26 or newer."))
+                    #elseif os(macOS)
+                    continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence requires macOS 26 or newer."))
+                    #endif
                 }
                 #else
                 self.respondingState = false
@@ -75,7 +80,11 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
         } else if errorDescription.contains("context") || errorDescription.contains("window") || errorDescription.contains("exceeded") {
             return .contextWindowExceeded
         } else if errorDescription.contains("not available") || errorDescription.contains("missing") || errorDescription.contains("-1") {
+            #if os(iOS)
             return .generationFailed("Apple Intelligence is not available. Please ensure you're running on a device with Apple Intelligence enabled (iPhone 15 Pro or newer with iOS 26+).")
+            #elseif os(macOS)
+            return .generationFailed("Apple Intelligence is not available. Please ensure you're running on an Apple Silicon Mac with macOS 26+ and Apple Intelligence enabled.")
+            #endif
         }
         
         return .generationFailed("AI response failed: \(error.localizedDescription)")
@@ -83,7 +92,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
     
     func generateTitle(from response: String, sessionId: String) async throws -> String {
         #if canImport(FoundationModels)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, *) {
             return await LLMSessionStore.shared.generateTitle(from: response)
         }
         #endif
@@ -98,7 +107,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
     
     func saveTranscript(sessionId: String) async throws -> String? {
         #if canImport(FoundationModels)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, *) {
             return await LLMSessionStore.shared.saveTranscript(sessionId: sessionId)
         }
         #endif
@@ -107,7 +116,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
     
     func loadTranscript(_ transcriptJSON: String, sessionId: String) async throws {
         #if canImport(FoundationModels)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, *) {
             await LLMSessionStore.shared.loadTranscript(transcriptJSON, sessionId: sessionId)
         }
         #endif
@@ -117,7 +126,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
 #if canImport(FoundationModels)
 import FoundationModels
 
-@available(iOS 26.0, *)
+@available(iOS 26.0, macOS 26.0, *)
 actor LLMSessionStore {
     static let shared = LLMSessionStore()
     

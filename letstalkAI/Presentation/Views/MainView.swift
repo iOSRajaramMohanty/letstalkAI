@@ -2,7 +2,7 @@
 //  MainView.swift
 //  letstalkAI
 //
-//  Main container view combining chat and sidebar
+//  Main container view combining chat and sidebar - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
@@ -19,11 +19,24 @@ struct MainView: View {
     @State private var showWebBrowser = false
     @State private var webBrowserURL: URL?
     
+    #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     
     private let sidebarWidth: CGFloat = 280
     
     var body: some View {
+        #if os(iOS)
+        iOSLayout
+        #elseif os(macOS)
+        macOSLayout
+        #endif
+    }
+    
+    // MARK: - iOS Layout
+    
+    #if os(iOS)
+    private var iOSLayout: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 ChatView(
@@ -90,16 +103,7 @@ struct MainView: View {
             }
         }
         .task {
-            await sessionListViewModel.loadSessions()
-            
-            var sessionToLoad: ChatSession? = sessionListViewModel.selectedSession
-            if sessionToLoad == nil {
-                sessionToLoad = await sessionListViewModel.createNewSession()
-            }
-            
-            if let session = sessionToLoad {
-                await chatViewModel.loadSession(session)
-            }
+            await loadInitialSession()
         }
     }
     
@@ -125,5 +129,80 @@ struct MainView: View {
                     sidebarOffset = 0
                 }
             }
+    }
+    #endif
+    
+    // MARK: - macOS Layout
+    
+    #if os(macOS)
+    private var macOSLayout: some View {
+        NavigationSplitView {
+            ChatSidebar(
+                viewModel: sessionListViewModel,
+                showSettings: $showSettings,
+                isVisible: .constant(true),
+                onSessionSelect: { session in
+                    Task {
+                        await chatViewModel.loadSession(session)
+                    }
+                }
+            )
+            .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
+        } detail: {
+            ChatView(
+                viewModel: chatViewModel,
+                showSidebar: $showSidebar,
+                showKnowledgeBase: $showKnowledgeBase,
+                showVoiceConversation: $showVoiceConversation,
+                showWebBrowser: $showWebBrowser,
+                webBrowserURL: $webBrowserURL
+            )
+        }
+        .sheet(isPresented: $showKnowledgeBase) {
+            NavigationStack {
+                KnowledgeBaseView(
+                    viewModel: DependencyContainer.shared.makeKnowledgeBaseViewModel(),
+                    session: chatViewModel.currentSession
+                )
+            }
+            .frame(minWidth: 500, minHeight: 400)
+        }
+        .sheet(isPresented: $showVoiceConversation) {
+            VoiceConversationView(
+                viewModel: DependencyContainer.shared.makeVoiceConversationViewModel(),
+                session: chatViewModel.currentSession
+            )
+            .frame(minWidth: 400, minHeight: 500)
+        }
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                SettingsView(viewModel: DependencyContainer.shared.makeSettingsViewModel())
+            }
+            .frame(minWidth: 400, minHeight: 300)
+        }
+        .sheet(isPresented: $showWebBrowser) {
+            if let url = webBrowserURL {
+                WebBrowserView(url: url)
+            }
+        }
+        .task {
+            await loadInitialSession()
+        }
+    }
+    #endif
+    
+    // MARK: - Common
+    
+    private func loadInitialSession() async {
+        await sessionListViewModel.loadSessions()
+        
+        var sessionToLoad: ChatSession? = sessionListViewModel.selectedSession
+        if sessionToLoad == nil {
+            sessionToLoad = await sessionListViewModel.createNewSession()
+        }
+        
+        if let session = sessionToLoad {
+            await chatViewModel.loadSession(session)
+        }
     }
 }

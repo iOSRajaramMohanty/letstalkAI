@@ -2,7 +2,7 @@
 //  ChatSidebar.swift
 //  letstalkAI
 //
-//  Sidebar for session management
+//  Sidebar for session management - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
@@ -29,7 +29,15 @@ struct ChatSidebar: View {
             
             footer
         }
-        .background(Color(.systemBackground))
+        .background(backgroundColor)
+    }
+    
+    private var backgroundColor: Color {
+        #if os(iOS)
+        Color(.systemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #endif
     }
     
     private var header: some View {
@@ -56,6 +64,7 @@ struct ChatSidebar: View {
                         .font(.title2)
                         .foregroundStyle(.blue)
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -141,6 +150,7 @@ struct ChatSidebar: View {
                 Label("Delete", systemImage: "trash")
             }
         }
+        #if os(iOS)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                 Task {
@@ -150,6 +160,7 @@ struct ChatSidebar: View {
                 Label("Delete", systemImage: "trash")
             }
         }
+        #endif
     }
     
     private var footer: some View {
@@ -174,6 +185,7 @@ struct ChatSidebar: View {
                     Image(systemName: "checklist")
                         .font(.title3)
                 }
+                .buttonStyle(.plain)
                 
                 Spacer()
                 
@@ -183,6 +195,7 @@ struct ChatSidebar: View {
                     Image(systemName: "gear")
                         .font(.title3)
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding()

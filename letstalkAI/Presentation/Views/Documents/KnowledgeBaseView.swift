@@ -2,11 +2,17 @@
 //  KnowledgeBaseView.swift
 //  letstalkAI
 //
-//  Document management view
+//  Document management view - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
 import UniformTypeIdentifiers
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct KnowledgeBaseView: View {
     @StateObject var viewModel: KnowledgeBaseViewModel
@@ -27,6 +33,7 @@ struct KnowledgeBaseView: View {
             }
         }
         .navigationTitle("Knowledge Base")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -51,6 +58,24 @@ struct KnowledgeBaseView: View {
                 }
             }
         }
+        #elseif os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+            
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    openDocumentPicker()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .disabled(viewModel.isProcessing)
+            }
+        }
+        #endif
         .onAppear {
             if let session = session {
                 viewModel.setSession(session)
@@ -72,6 +97,24 @@ struct KnowledgeBaseView: View {
         }
     }
     
+    #if os(macOS)
+    private func openDocumentPicker() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [UTType.pdf]
+        panel.message = "Select a PDF document to upload"
+        panel.prompt = "Upload"
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                await viewModel.addDocument(url: url)
+            }
+        }
+    }
+    #endif
+    
     private var emptyState: some View {
         VStack(spacing: 20) {
             Image(systemName: "doc.text.fill")
@@ -89,7 +132,11 @@ struct KnowledgeBaseView: View {
                 .padding(.horizontal, 40)
             
             Button {
+                #if os(iOS)
                 showDocumentPicker = true
+                #elseif os(macOS)
+                openDocumentPicker()
+                #endif
             } label: {
                 Label("Upload Document", systemImage: "arrow.up.doc")
                     .padding()
@@ -167,6 +214,9 @@ struct KnowledgeBaseView: View {
     }
 }
 
+// MARK: - iOS Document Picker
+
+#if os(iOS)
 struct DocumentPickerView: UIViewControllerRepresentable {
     let onDocumentPicked: (URL) -> Void
     
@@ -196,3 +246,4 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         }
     }
 }
+#endif

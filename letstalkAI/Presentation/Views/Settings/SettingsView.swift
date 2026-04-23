@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  letstalkAI
 //
-//  App settings view
+//  App settings view - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
@@ -48,6 +48,7 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -56,7 +57,19 @@ struct SettingsView: View {
                 }
             }
         }
+        #elseif os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+        #endif
         .preferredColorScheme(viewModel.colorScheme)
+        #if os(macOS)
+        .frame(minWidth: 400, minHeight: 400)
+        #endif
     }
     
     private var appInfoHeader: some View {

@@ -2,7 +2,7 @@
 //  OnboardingView.swift
 //  letstalkAI
 //
-//  Onboarding flow for new users
+//  Onboarding flow for new users - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
@@ -12,7 +12,7 @@ struct OnboardingView: View {
     
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            backgroundView
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -24,13 +24,26 @@ struct OnboardingView: View {
                             .tag(index)
                     }
                 }
+                #if os(iOS)
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                #endif
                 
                 pageIndicator
                 
                 navigationButtons
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 600, minHeight: 500)
+        #endif
+    }
+    
+    private var backgroundView: some View {
+        #if os(iOS)
+        Color(.systemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #endif
     }
     
     private var skipButton: some View {

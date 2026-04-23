@@ -2,11 +2,17 @@
 //  ChatBubbleView.swift
 //  letstalkAI
 //
-//  Chat message bubble component
+//  Chat message bubble component - Cross-platform (iOS/macOS)
 //
 
 import SwiftUI
 import MarkdownUI
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct ChatBubbleView: View {
     let message: ChatMessage
@@ -57,7 +63,7 @@ struct ChatBubbleView: View {
         .textSelection(.enabled)
         .contextMenu {
             Button {
-                UIPasteboard.general.string = message.text
+                copyToClipboard(message.text)
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }
@@ -72,22 +78,38 @@ struct ChatBubbleView: View {
         }
     }
     
+    private func copyToClipboard(_ text: String) {
+        #if os(iOS)
+        UIPasteboard.general.string = text
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
+    }
+    
+    @ViewBuilder
     private var bubbleBackground: some View {
-        Group {
-            if message.isUser {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [.blue, .blue.opacity(0.8)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        if message.isUser {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [.blue, .blue.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-            } else {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemGray6))
-            }
+                )
+        } else {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(aiBubbleColor)
         }
+    }
+    
+    private var aiBubbleColor: Color {
+        #if os(iOS)
+        Color(.systemGray6)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
     }
     
     private var actionButtons: some View {
@@ -107,9 +129,10 @@ struct ChatBubbleView: View {
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(Color(.systemGray6))
+                        .fill(aiBubbleColor)
                 )
             }
+            .buttonStyle(.plain)
             
             if let sources = message.sources, !sources.isEmpty {
                 Button {
@@ -126,9 +149,10 @@ struct ChatBubbleView: View {
                     .padding(.vertical, 6)
                     .background(
                         Capsule()
-                            .fill(Color(.systemGray6))
+                            .fill(aiBubbleColor)
                     )
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -153,6 +177,7 @@ struct ChatBubbleView: View {
                 .padding()
             }
             .navigationTitle("Sources")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -161,8 +186,20 @@ struct ChatBubbleView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showSources = false
+                    }
+                }
+            }
+            .frame(minWidth: 400, minHeight: 300)
+            #endif
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+        #endif
     }
 }
 
@@ -206,11 +243,19 @@ struct SourceCardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground))
+                    .fill(cardBackgroundColor)
                     .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             )
         }
         .buttonStyle(.plain)
+    }
+    
+    private var cardBackgroundColor: Color {
+        #if os(iOS)
+        Color(.systemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #endif
     }
 }
 

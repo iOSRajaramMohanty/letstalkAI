@@ -12,8 +12,6 @@ import AVFoundation
 
 #if os(iOS)
 import UIKit
-#elseif os(macOS)
-import AppKit
 #endif
 
 final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
@@ -26,8 +24,7 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
     private var speechDelegate: SpeechDelegateHandler?
     
     #if os(macOS)
-    private var nsSpeechSynthesizer: NSSpeechSynthesizer?
-    private var macSpeechDelegate: MacSpeechDelegateHandler?
+    private var macSpeechDelegate: SpeechDelegateHandler?
     #endif
     
     private var _isRecording = false
@@ -45,11 +42,7 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
     
     var isRecording: Bool { _isRecording }
     var isSpeaking: Bool { 
-        #if os(iOS)
         return speechSynthesizer.isSpeaking
-        #elseif os(macOS)
-        return nsSpeechSynthesizer?.isSpeaking ?? speechSynthesizer.isSpeaking
-        #endif
     }
     var recognizedText: String { _recognizedText }
     var currentSpeakingText: String { _currentSpeakingText }
@@ -57,8 +50,6 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
     init() {
         #if os(iOS)
         feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
-        #elseif os(macOS)
-        nsSpeechSynthesizer = NSSpeechSynthesizer()
         #endif
     }
     
@@ -277,29 +268,29 @@ final class SpeechRepository: SpeechRepositoryProtocol, @unchecked Sendable {
     
     #if os(macOS)
     private func speakMacOS(_ text: String, completion: @escaping @Sendable () -> Void) async {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        utterance.pitchMultiplier = 1.0
+        utterance.volume = 1.0
+        
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let handler = MacSpeechDelegateHandler(onFinish: {
+            let handler = SpeechDelegateHandler(onFinish: {
                 completion()
                 continuation.resume()
             })
             
             self.macSpeechDelegate = handler
-            self.nsSpeechSynthesizer?.delegate = handler
-            self.nsSpeechSynthesizer?.startSpeaking(text)
+            self.speechSynthesizer.delegate = handler
+            self.speechSynthesizer.speak(utterance)
         }
     }
     #endif
     
     func stopSpeaking() {
-        #if os(iOS)
         if speechSynthesizer.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
         }
-        #elseif os(macOS)
-        if nsSpeechSynthesizer?.isSpeaking == true {
-            nsSpeechSynthesizer?.stopSpeaking()
-        }
-        #endif
         _currentSpeakingText = ""
     }
 }
@@ -322,18 +313,3 @@ private final class SpeechDelegateHandler: NSObject, AVSpeechSynthesizerDelegate
     }
 }
 
-// MARK: - macOS Speech Delegate
-
-#if os(macOS)
-private final class MacSpeechDelegateHandler: NSObject, NSSpeechSynthesizerDelegate, @unchecked Sendable {
-    let onFinish: () -> Void
-    
-    init(onFinish: @escaping () -> Void) {
-        self.onFinish = onFinish
-    }
-    
-    func speechSynthesizer(_ sender: NSSpeechSynthesizer, didFinishSpeaking finishedSpeaking: Bool) {
-        onFinish()
-    }
-}
-#endif

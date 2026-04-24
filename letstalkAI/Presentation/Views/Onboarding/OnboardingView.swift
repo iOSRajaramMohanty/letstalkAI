@@ -10,6 +10,14 @@ import SwiftUI
 struct OnboardingView: View {
     @StateObject var viewModel: OnboardingViewModel
     
+    init(viewModel: OnboardingViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+    
+    init(isFromSettings: Bool = false, onComplete: @escaping () -> Void) {
+        _viewModel = StateObject(wrappedValue: OnboardingViewModel(isFromSettings: isFromSettings, onComplete: onComplete))
+    }
+    
     var body: some View {
         ZStack {
             backgroundView
@@ -50,7 +58,7 @@ struct OnboardingView: View {
         HStack {
             Spacer()
             
-            Button("Skip") {
+            Button(viewModel.isFromSettings ? "Close" : "Skip") {
                 viewModel.skip()
             }
             .foregroundStyle(.secondary)
@@ -86,7 +94,7 @@ struct OnboardingView: View {
             Button {
                 viewModel.nextStep()
             } label: {
-                Text(viewModel.currentStep == viewModel.steps.count - 1 ? "Get Started" : "Continue")
+                Text(viewModel.currentStep == viewModel.steps.count - 1 ? (viewModel.isFromSettings ? "Done" : "Get Started") : "Continue")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)

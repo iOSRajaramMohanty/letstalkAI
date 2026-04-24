@@ -14,16 +14,67 @@ import FoundationModels
 
 final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
     private var respondingState = false
+    private var hasLoggedDeviceSupport = false
     
     var isResponding: Bool {
         respondingState
     }
     
+    private func logDeviceSupport() {
+        guard !hasLoggedDeviceSupport else { return }
+        hasLoggedDeviceSupport = true
+        
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🤖 [LLM] Apple Intelligence Support Check")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
+        #if os(iOS)
+        let osName = "iOS"
+        let currentVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let versionString = "\(currentVersion.majorVersion).\(currentVersion.minorVersion).\(currentVersion.patchVersion)"
+        print("   📱 Platform: iOS")
+        print("   📱 Current Version: \(versionString)")
+        print("   📱 Required Version: iOS 26.0+")
+        #elseif os(macOS)
+        let osName = "macOS"
+        let currentVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let versionString = "\(currentVersion.majorVersion).\(currentVersion.minorVersion).\(currentVersion.patchVersion)"
+        print("   💻 Platform: macOS")
+        print("   💻 Current Version: \(versionString)")
+        print("   💻 Required Version: macOS 26.0+")
+        #endif
+        
+        #if canImport(FoundationModels)
+        print("   ✅ FoundationModels framework: Available")
+        if #available(iOS 26.0, macOS 26.0, *) {
+            print("   ✅ OS version: Supported")
+            print("   ✅ Apple Intelligence: Should be available")
+            print("   ℹ️  Note: Actual availability depends on device hardware and settings")
+        } else {
+            print("   ❌ OS version: Not supported (need iOS/macOS 26.0+)")
+            print("   ❌ Apple Intelligence: Not available")
+        }
+        #else
+        print("   ❌ FoundationModels framework: Not available")
+        print("   ❌ Apple Intelligence: Not supported on this platform")
+        #endif
+        
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    }
+    
     func getOrCreateSession(sessionId: String) async {
+        logDeviceSupport()
+        
         #if canImport(FoundationModels)
         if #available(iOS 26.0, macOS 26.0, *) {
+            print("🤖 [LLM] Creating/getting session: \(sessionId.prefix(20))...")
             await LLMSessionStore.shared.createSession(sessionId)
+            print("✅ [LLM] Session ready")
+        } else {
+            print("❌ [LLM] Cannot create session - OS version not supported")
         }
+        #else
+        print("❌ [LLM] Cannot create session - FoundationModels not available")
         #endif
     }
     
@@ -35,10 +86,19 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                     return
                 }
                 
+                self.logDeviceSupport()
+                
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                print("🤖 [LLM] Generating response...")
+                print("   📝 Prompt length: \(prompt.count) characters")
+                print("   📋 Session: \(sessionId.prefix(20))...")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                
                 self.respondingState = true
                 
                 #if canImport(FoundationModels)
                 if #available(iOS 26.0, macOS 26.0, *) {
+                    print("🤖 [LLM] Using Apple Intelligence (FoundationModels)...")
                     do {
                         try await LLMSessionStore.shared.streamResponse(
                             prompt: prompt,
@@ -48,14 +108,17 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                         }
                         
                         self.respondingState = false
+                        print("✅ [LLM] Response streaming complete")
                         continuation.finish()
                     } catch {
                         self.respondingState = false
+                        print("❌ [LLM] Generation failed: \(error.localizedDescription)")
                         let mappedError = self.mapError(error)
                         continuation.finish(throwing: mappedError)
                     }
                 } else {
                     self.respondingState = false
+                    print("❌ [LLM] OS version not supported")
                     #if os(iOS)
                     continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence requires iOS 26 or newer."))
                     #elseif os(macOS)
@@ -64,6 +127,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                 }
                 #else
                 self.respondingState = false
+                print("❌ [LLM] FoundationModels not available on this platform")
                 continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence is not available on this device."))
                 #endif
             }
@@ -73,13 +137,26 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
     private func mapError(_ error: Error) -> LLMError {
         let errorDescription = error.localizedDescription.lowercased()
         
+        print("🔍 [LLM] Analyzing error: \(error.localizedDescription)")
+        
         if errorDescription.contains("guardrail") {
+            print("⚠️ [LLM] Error type: Safety guardrail triggered")
             return .safetyGuardrail
         } else if errorDescription.contains("rate") || errorDescription.contains("limit") {
+            print("⚠️ [LLM] Error type: Rate limited")
             return .rateLimited
         } else if errorDescription.contains("context") || errorDescription.contains("window") || errorDescription.contains("exceeded") {
+            print("⚠️ [LLM] Error type: Context window exceeded")
             return .contextWindowExceeded
-        } else if errorDescription.contains("not available") || errorDescription.contains("missing") || errorDescription.contains("-1") {
+        } else if errorDescription.contains("not available") || errorDescription.contains("missing") || errorDescription.contains("-1") || errorDescription.contains("model") || errorDescription.contains("asset") {
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("⚠️ [LLM] Error type: Apple Intelligence not available")
+            print("   This could be because:")
+            print("   • Device doesn't support Apple Intelligence")
+            print("   • Apple Intelligence is not enabled in Settings")
+            print("   • Model assets are not downloaded")
+            print("   • Running on Simulator (not supported)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             #if os(iOS)
             return .generationFailed("Apple Intelligence is not available. Please ensure you're running on a device with Apple Intelligence enabled (iPhone 15 Pro or newer with iOS 26+).")
             #elseif os(macOS)
@@ -87,6 +164,7 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
             #endif
         }
         
+        print("⚠️ [LLM] Error type: Unknown - \(error.localizedDescription)")
         return .generationFailed("AI response failed: \(error.localizedDescription)")
     }
     
@@ -138,19 +216,42 @@ actor LLMSessionStore {
         }
     }
     
+    func resetSession(_ sessionId: String) {
+        print("🔄 [LLM] Resetting session due to context limit...")
+        sessions[sessionId] = LanguageModelSession()
+    }
+    
     func streamResponse(
         prompt: String,
         sessionId: String,
         onPartial: @Sendable (String) -> Void
     ) async throws {
-        guard let session = sessions[sessionId] else {
+        guard var session = sessions[sessionId] else {
             throw LLMError.sessionNotFound
         }
         
-        let responseStream = session.streamResponse(to: prompt, generating: String.self)
-        
-        for try await partialResponse in responseStream {
-            onPartial(partialResponse.content)
+        do {
+            let responseStream = session.streamResponse(to: prompt, generating: String.self)
+            
+            for try await partialResponse in responseStream {
+                onPartial(partialResponse.content)
+            }
+        } catch {
+            let errorDesc = error.localizedDescription.lowercased()
+            if errorDesc.contains("context") || errorDesc.contains("exceeded") || errorDesc.contains("window") {
+                print("⚠️ [LLM] Context exceeded, resetting session and retrying...")
+                
+                sessions[sessionId] = LanguageModelSession()
+                session = sessions[sessionId]!
+                
+                print("🔄 [LLM] Retrying with fresh session")
+                let retryStream = session.streamResponse(to: prompt, generating: String.self)
+                for try await partialResponse in retryStream {
+                    onPartial(partialResponse.content)
+                }
+            } else {
+                throw error
+            }
         }
     }
     

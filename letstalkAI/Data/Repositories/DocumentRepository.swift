@@ -33,7 +33,25 @@ final class DocumentRepository: DocumentRepositoryProtocol, @unchecked Sendable 
     }
     
     func deleteDocument(_ documentId: String) async throws {
-        throw DocumentError.notFound
+        print("🗑️ [DocumentRepository] Getting document info...")
+        
+        guard let dto = try databaseManager.getDocument(by: documentId) else {
+            print("❌ [DocumentRepository] Document not found in database")
+            throw DocumentError.notFound
+        }
+        
+        print("🗑️ [DocumentRepository] Deleting file from storage: \(dto.path)")
+        let fileURL = URL(fileURLWithPath: dto.path)
+        if FileManager.default.fileExists(atPath: dto.path) {
+            try FileManager.default.removeItem(at: fileURL)
+            print("✅ [DocumentRepository] File deleted from storage")
+        } else {
+            print("⚠️ [DocumentRepository] File not found on disk (already deleted?)")
+        }
+        
+        print("🗑️ [DocumentRepository] Deleting document from database...")
+        try databaseManager.deleteDocument(documentId)
+        print("✅ [DocumentRepository] Document and chunks deleted from database")
     }
     
     func saveDocumentChunk(_ chunk: DocumentChunk) async throws -> String {
@@ -54,6 +72,10 @@ final class DocumentRepository: DocumentRepositoryProtocol, @unchecked Sendable 
         try fileStorageManager.extractTextFromPDF(at: url)
     }
     
+    func extractContentFromPDF(at url: URL, documentId: String) async throws -> PDFExtractionResult {
+        try fileStorageManager.extractContentFromPDF(at: url, documentId: documentId)
+    }
+    
     func chunkText(_ text: String, maxChunkSize: Int, overlapTokens: Int) -> [String] {
         fileStorageManager.chunkText(text, maxChunkSize: maxChunkSize, overlapTokens: overlapTokens)
     }
@@ -64,5 +86,42 @@ final class DocumentRepository: DocumentRepositoryProtocol, @unchecked Sendable 
         } catch {
             return false
         }
+    }
+    
+    // MARK: - Document Images
+    
+    func saveDocumentImage(_ image: DocumentImage) async throws -> String {
+        let dto = documentMapper.imageToDTO(image)
+        return try databaseManager.saveDocumentImage(dto)
+    }
+    
+    func getImagesForDocument(_ documentId: String) async throws -> [DocumentImage] {
+        let dtos = try databaseManager.getImagesForDocument(documentId)
+        return dtos.map { documentMapper.imageToDomain($0) }
+    }
+    
+    func getImagesForPage(documentId: String, pageIndex: Int) async throws -> [DocumentImage] {
+        let dtos = try databaseManager.getImagesForPage(documentId: documentId, pageIndex: pageIndex)
+        return dtos.map { documentMapper.imageToDomain($0) }
+    }
+    
+    func deleteImagesForDocument(_ documentId: String) async throws {
+        try databaseManager.deleteImagesForDocument(documentId)
+        fileStorageManager.deleteImagesForDocument(documentId)
+    }
+    
+    func searchImagesByOCR(query: String, documentId: String) async throws -> [DocumentImage] {
+        let dtos = try databaseManager.searchImagesByOCR(query: query, documentId: documentId)
+        return dtos.map { documentMapper.imageToDomain($0) }
+    }
+    
+    // MARK: - Query Learning
+    
+    func learnQueryLabelMapping(queryWord: String, matchedLabel: String) async throws {
+        try databaseManager.learnQueryLabelMapping(queryWord: queryWord, matchedLabel: matchedLabel)
+    }
+    
+    func getLearnedLabelsForQuery(_ queryWord: String) async throws -> [(label: String, score: Int)] {
+        try databaseManager.getLearnedLabelsForQuery(queryWord)
     }
 }

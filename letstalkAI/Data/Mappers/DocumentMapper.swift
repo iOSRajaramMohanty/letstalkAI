@@ -36,6 +36,7 @@ final class DocumentMapper: Sendable {
             documentId: chunk.documentId,
             text: chunk.text,
             chunkIndex: chunk.index,
+            pageIndex: chunk.pageIndex,
             isEmbedded: chunk.isEmbedded
         )
     }
@@ -46,7 +47,30 @@ final class DocumentMapper: Sendable {
             documentId: dto.documentId,
             text: dto.text,
             index: dto.chunkIndex,
+            pageIndex: dto.pageIndex,
             isEmbedded: dto.isEmbedded
+        )
+    }
+    
+    func imageToDTO(_ image: DocumentImage) -> DocumentImageDTO {
+        DocumentImageDTO(
+            id: image.id,
+            documentId: image.documentId,
+            pageIndex: image.pageIndex,
+            imagePath: image.imagePath,
+            ocrText: image.ocrText,
+            classificationLabels: image.classificationLabels
+        )
+    }
+    
+    func imageToDomain(_ dto: DocumentImageDTO) -> DocumentImage {
+        DocumentImage(
+            id: dto.id,
+            documentId: dto.documentId,
+            pageIndex: dto.pageIndex,
+            imagePath: dto.imagePath,
+            ocrText: dto.ocrText,
+            classificationLabels: dto.classificationLabels
         )
     }
 }

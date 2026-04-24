@@ -170,6 +170,26 @@ struct KnowledgeBaseView: View {
             Section("Uploaded Documents") {
                 ForEach(viewModel.documents) { document in
                     documentRow(document)
+                        #if os(iOS)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Task {
+                                    await viewModel.deleteDocument(document)
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        #endif
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                Task {
+                                    await viewModel.deleteDocument(document)
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                 }
             }
         }

@@ -55,6 +55,10 @@ struct ChatBubbleView: View {
             } else {
                 Markdown(message.text)
                     .markdownTheme(colorScheme == .dark ? .gitHub : .basic)
+                
+                if let imageURLs = message.imageURLs, !imageURLs.isEmpty {
+                    documentImagesView(imageURLs)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -76,6 +80,53 @@ struct ChatBubbleView: View {
                 }
             }
         }
+    }
+    
+    @ViewBuilder
+    private func documentImagesView(_ imageURLs: [URL]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("📄 Document Pages")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(imageURLs, id: \.absoluteString) { imageURL in
+                        documentImageThumbnail(imageURL)
+                    }
+                }
+            }
+        }
+        .padding(.top, 8)
+    }
+    
+    @ViewBuilder
+    private func documentImageThumbnail(_ imageURL: URL) -> some View {
+        #if os(iOS)
+        if let uiImage = UIImage(contentsOfFile: imageURL.path) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxHeight: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
+        }
+        #elseif os(macOS)
+        if let nsImage = NSImage(contentsOf: imageURL) {
+            Image(nsImage: nsImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxHeight: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
+        }
+        #endif
     }
     
     private func copyToClipboard(_ text: String) {

@@ -15,6 +15,8 @@ final class DatabaseManager: @unchecked Sendable {
     private let chatMessages = Table("chat_messages")
     private let documents = Table("documents")
     private let documentChunks = Table("document_chunks")
+    private let documentImages = Table("document_images")
+    private let queryLearning = Table("query_learning")
     
     private let sessionId = Expression<String>("id")
     private let sessionTitle = Expression<String>("title")
@@ -30,6 +32,7 @@ final class DatabaseManager: @unchecked Sendable {
     private let messageIsUser = Expression<Bool>("is_user")
     private let messageTimestamp = Expression<Date>("timestamp")
     private let messageSources = Expression<String?>("sources")
+    private let messageImageURLs = Expression<String?>("image_urls")
     
     private let documentId = Expression<String>("id")
     private let documentSessionId = Expression<String>("session_id")
@@ -43,6 +46,20 @@ final class DatabaseManager: @unchecked Sendable {
     private let chunkText = Expression<String>("text")
     private let chunkIndex = Expression<Int>("chunk_index")
     private let chunkEmbedded = Expression<Bool>("embedded")
+    private let chunkPageIndex = Expression<Int?>("page_index")
+    
+    private let imageId = Expression<String>("id")
+    private let imageDocumentId = Expression<String>("document_id")
+    private let imagePageIndex = Expression<Int>("page_index")
+    private let imagePath = Expression<String>("image_path")
+    private let imageOcrText = Expression<String>("ocr_text")
+    private let imageClassificationLabels = Expression<String>("classification_labels")
+    
+    private let learningId = Expression<String>("id")
+    private let learningQueryWord = Expression<String>("query_word")
+    private let learningMatchedLabel = Expression<String>("matched_label")
+    private let learningSuccessCount = Expression<Int>("success_count")
+    private let learningLastUsed = Expression<Date>("last_used")
     
     init(inMemory: Bool = false) {
         setupDatabase(inMemory: inMemory)
@@ -84,6 +101,7 @@ final class DatabaseManager: @unchecked Sendable {
                 t.column(messageIsUser)
                 t.column(messageTimestamp)
                 t.column(messageSources)
+                t.column(messageImageURLs)
                 t.foreignKey(messageSessionId, references: chatSessions, sessionId, delete: .cascade)
             })
             
@@ -103,7 +121,26 @@ final class DatabaseManager: @unchecked Sendable {
                 t.column(chunkText)
                 t.column(chunkIndex)
                 t.column(chunkEmbedded, defaultValue: false)
+                t.column(chunkPageIndex)
                 t.foreignKey(chunkDocumentId, references: documents, documentId, delete: .cascade)
+            })
+            
+            try db?.run(documentImages.create(ifNotExists: true) { t in
+                t.column(imageId, primaryKey: true)
+                t.column(imageDocumentId)
+                t.column(imagePageIndex)
+                t.column(imagePath)
+                t.column(imageOcrText, defaultValue: "")
+                t.column(imageClassificationLabels, defaultValue: "")
+                t.foreignKey(imageDocumentId, references: documents, documentId, delete: .cascade)
+            })
+            
+            try db?.run(queryLearning.create(ifNotExists: true) { t in
+                t.column(learningId, primaryKey: true)
+                t.column(learningQueryWord)
+                t.column(learningMatchedLabel)
+                t.column(learningSuccessCount, defaultValue: 1)
+                t.column(learningLastUsed)
             })
         } catch {
             print("Create tables error: \(error)")
@@ -123,6 +160,31 @@ final class DatabaseManager: @unchecked Sendable {
             
             if !columns.contains("transcript_entry_json") {
                 try db?.run("ALTER TABLE chat_sessions ADD COLUMN transcript_entry_json TEXT DEFAULT ''")
+            }
+            
+            let imagePragma = try db?.prepare("PRAGMA table_info(document_images)")
+            let imageColumns = imagePragma?.compactMap { row in
+                row[1] as? String
+            } ?? []
+            
+            if !imageColumns.contains("ocr_text") {
+                try db?.run("ALTER TABLE document_images ADD COLUMN ocr_text TEXT DEFAULT ''")
+                print("   📦 [Migration] Added ocr_text column to document_images")
+            }
+            
+            if !imageColumns.contains("classification_labels") {
+                try db?.run("ALTER TABLE document_images ADD COLUMN classification_labels TEXT DEFAULT ''")
+                print("   📦 [Migration] Added classification_labels column to document_images")
+            }
+            
+            let messagePragma = try db?.prepare("PRAGMA table_info(chat_messages)")
+            let messageColumns = messagePragma?.compactMap { row in
+                row[1] as? String
+            } ?? []
+            
+            if !messageColumns.contains("image_urls") {
+                try db?.run("ALTER TABLE chat_messages ADD COLUMN image_urls TEXT")
+                print("   📦 [Migration] Added image_urls column to chat_messages")
             }
         } catch {
             print("Migration error: \(error)")
@@ -235,7 +297,8 @@ final class DatabaseManager: @unchecked Sendable {
             messageText <- dto.text,
             messageIsUser <- dto.isUser,
             messageTimestamp <- dto.timestamp,
-            messageSources <- dto.sourcesJSON
+            messageSources <- dto.sourcesJSON,
+            messageImageURLs <- dto.imageURLsJSON
         )
         try db?.run(insert)
     }
@@ -254,7 +317,8 @@ final class DatabaseManager: @unchecked Sendable {
                 text: row[messageText],
                 isUser: row[messageIsUser],
                 timestamp: row[messageTimestamp],
-                sourcesJSON: row[messageSources]
+                sourcesJSON: row[messageSources],
+                imageURLsJSON: row[messageImageURLs]
             )
         } ?? []
     }
@@ -303,6 +367,24 @@ final class DatabaseManager: @unchecked Sendable {
         return count > 0
     }
     
+    func getDocument(by id: String) throws -> DocumentDTO? {
+        let query = documents.filter(documentId == id)
+        guard let row = try db?.pluck(query) else { return nil }
+        return DocumentDTO(
+            id: row[documentId],
+            sessionId: row[documentSessionId],
+            name: row[documentName],
+            path: row[documentPath],
+            type: row[documentType],
+            uploadedAt: row[documentUploadedAt]
+        )
+    }
+    
+    func deleteDocument(_ id: String) throws {
+        let documentRow = documents.filter(documentId == id)
+        try db?.run(documentRow.delete())
+    }
+    
     func saveDocumentChunk(_ dto: DocumentChunkDTO) throws -> String {
         let insert = documentChunks.insert(
             chunkId <- dto.id,
@@ -337,5 +419,149 @@ final class DatabaseManager: @unchecked Sendable {
     func markChunkAsEmbedded(_ id: String) throws {
         let chunk = documentChunks.filter(chunkId == id)
         try db?.run(chunk.update(chunkEmbedded <- true))
+    }
+    
+    // MARK: - Document Images
+    
+    func saveDocumentImage(_ dto: DocumentImageDTO) throws -> String {
+        let labelsString = dto.classificationLabels.joined(separator: "|")
+        let insert = documentImages.insert(
+            imageId <- dto.id,
+            imageDocumentId <- dto.documentId,
+            imagePageIndex <- dto.pageIndex,
+            imagePath <- dto.imagePath,
+            imageOcrText <- dto.ocrText,
+            imageClassificationLabels <- labelsString
+        )
+        try db?.run(insert)
+        return dto.id
+    }
+    
+    func getImagesForDocument(_ documentIdValue: String) throws -> [DocumentImageDTO] {
+        let images = try db?.prepare(
+            documentImages
+                .filter(imageDocumentId == documentIdValue)
+                .order(imagePageIndex.asc)
+        )
+        
+        return images?.map { row in
+            let labelsString = row[imageClassificationLabels]
+            let labels = labelsString.isEmpty ? [] : labelsString.split(separator: "|").map(String.init)
+            return DocumentImageDTO(
+                id: row[imageId],
+                documentId: row[imageDocumentId],
+                pageIndex: row[imagePageIndex],
+                imagePath: row[imagePath],
+                ocrText: row[imageOcrText],
+                classificationLabels: labels
+            )
+        } ?? []
+    }
+    
+    func getImagesForPage(documentId documentIdValue: String, pageIndex pageIndexValue: Int) throws -> [DocumentImageDTO] {
+        let images = try db?.prepare(
+            documentImages
+                .filter(imageDocumentId == documentIdValue && imagePageIndex == pageIndexValue)
+        )
+        
+        return images?.map { row in
+            let labelsString = row[imageClassificationLabels]
+            let labels = labelsString.isEmpty ? [] : labelsString.split(separator: "|").map(String.init)
+            return DocumentImageDTO(
+                id: row[imageId],
+                documentId: row[imageDocumentId],
+                pageIndex: row[imagePageIndex],
+                imagePath: row[imagePath],
+                ocrText: row[imageOcrText],
+                classificationLabels: labels
+            )
+        } ?? []
+    }
+    
+    func searchImagesByOCR(query: String, documentId documentIdValue: String) throws -> [DocumentImageDTO] {
+        let queryLower = query.lowercased()
+        let images = try db?.prepare(
+            documentImages
+                .filter(imageDocumentId == documentIdValue)
+                .order(imagePageIndex.asc)
+        )
+        
+        return images?.compactMap { row -> DocumentImageDTO? in
+            let ocrText = row[imageOcrText].lowercased()
+            let queryWords = queryLower.split(separator: " ").map(String.init)
+            let hasMatch = queryWords.contains { word in
+                ocrText.contains(word) && word.count > 2
+            }
+            
+            if hasMatch {
+                let labelsString = row[imageClassificationLabels]
+                let labels = labelsString.isEmpty ? [] : labelsString.split(separator: "|").map(String.init)
+                return DocumentImageDTO(
+                    id: row[imageId],
+                    documentId: row[imageDocumentId],
+                    pageIndex: row[imagePageIndex],
+                    imagePath: row[imagePath],
+                    ocrText: row[imageOcrText],
+                    classificationLabels: labels
+                )
+            }
+            return nil
+        } ?? []
+    }
+    
+    func deleteImagesForDocument(_ documentIdValue: String) throws {
+        let images = documentImages.filter(imageDocumentId == documentIdValue)
+        try db?.run(images.delete())
+    }
+    
+    // MARK: - Query Learning
+    
+    func learnQueryLabelMapping(queryWord: String, matchedLabel: String) throws {
+        let queryWordLower = queryWord.lowercased()
+        let labelLower = matchedLabel.lowercased()
+        
+        let existing = queryLearning.filter(learningQueryWord == queryWordLower && learningMatchedLabel == labelLower)
+        
+        if let row = try db?.pluck(existing) {
+            let currentCount = row[learningSuccessCount]
+            try db?.run(existing.update(
+                learningSuccessCount <- currentCount + 1,
+                learningLastUsed <- Date()
+            ))
+        } else {
+            let insert = queryLearning.insert(
+                learningId <- UUID().uuidString,
+                learningQueryWord <- queryWordLower,
+                learningMatchedLabel <- labelLower,
+                learningSuccessCount <- 1,
+                learningLastUsed <- Date()
+            )
+            try db?.run(insert)
+        }
+    }
+    
+    func getLearnedLabelsForQuery(_ queryWord: String) throws -> [(label: String, score: Int)] {
+        let queryWordLower = queryWord.lowercased()
+        
+        let results = try db?.prepare(
+            queryLearning
+                .filter(learningQueryWord == queryWordLower)
+                .order(learningSuccessCount.desc)
+                .limit(10)
+        )
+        
+        return results?.map { row in
+            (label: row[learningMatchedLabel], score: row[learningSuccessCount])
+        } ?? []
+    }
+    
+    func getAllLearnedMappings() throws -> [(queryWord: String, label: String, score: Int)] {
+        let results = try db?.prepare(
+            queryLearning.order(learningSuccessCount.desc).limit(100)
+        )
+        
+        return results?.map { row in
+            (queryWord: row[learningQueryWord], label: row[learningMatchedLabel], score: row[learningSuccessCount])
+        } ?? []
     }
 }

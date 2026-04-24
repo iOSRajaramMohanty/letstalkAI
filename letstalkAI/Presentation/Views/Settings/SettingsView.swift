@@ -16,6 +16,7 @@ import AppKit
 struct SettingsView: View {
     @StateObject var viewModel: SettingsViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showTutorial = false
     
     var body: some View {
         ScrollView {
@@ -145,10 +146,15 @@ struct SettingsView: View {
                     title: "View Tutorial",
                     showChevron: true
                 ) {
-                    // TODO: Show tutorial
+                    showTutorial = true
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .sheet(isPresented: $showTutorial) {
+            OnboardingView(isFromSettings: true) {
+                showTutorial = false
+            }
         }
     }
     

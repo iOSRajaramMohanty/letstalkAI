@@ -47,7 +47,16 @@ final class KnowledgeBaseViewModel: ObservableObject {
     }
     
     func addDocument(url: URL) async {
-        guard let session = session else { return }
+        guard let session = session else {
+            print("❌ [KnowledgeBase] No session available")
+            return
+        }
+        
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📥 [KnowledgeBase] Starting document upload...")
+        print("   Session: \(session.id)")
+        print("   File: \(url.lastPathComponent)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         isProcessing = true
         processingFileName = url.lastPathComponent
@@ -58,15 +67,47 @@ final class KnowledgeBaseViewModel: ObservableObject {
             let success = try await addDocumentUseCase.execute(url: url, session: session)
             
             if success {
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                print("✅ [KnowledgeBase] Document upload successful!")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 successMessage = "Document added successfully"
                 await loadDocuments()
             }
         } catch {
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("❌ [KnowledgeBase] Document upload failed!")
+            print("   Error: \(error.localizedDescription)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             errorMessage = error.localizedDescription
         }
         
         isProcessing = false
         processingFileName = ""
+    }
+    
+    func deleteDocument(_ document: Document) async {
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🗑️ [KnowledgeBase] Deleting document...")
+        print("   Document: \(document.name)")
+        print("   ID: \(document.id)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
+        errorMessage = nil
+        successMessage = nil
+        
+        do {
+            try await addDocumentUseCase.deleteDocument(document.id)
+            
+            print("✅ [KnowledgeBase] Document deleted successfully")
+            successMessage = "Document deleted"
+            
+            withAnimation {
+                documents.removeAll { $0.id == document.id }
+            }
+        } catch {
+            print("❌ [KnowledgeBase] Delete failed: \(error.localizedDescription)")
+            errorMessage = "Failed to delete document: \(error.localizedDescription)"
+        }
     }
     
     func clearMessages() {

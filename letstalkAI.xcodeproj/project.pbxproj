@@ -78,7 +78,6 @@
 		6576EDE934080949FBB5E24F /* MockSessionRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70AAFE56938784196AB8649 /* MockSessionRepository.swift */; };
 		68E0BD8384B4E60E34465AE1 /* MockLLMRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00B2C0FEDB33DEE483E2E0 /* MockLLMRepository.swift */; };
 		69549311E2C7A3E973D73FAD /* VoiceConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B49A3D47EB0D136EC89E74 /* VoiceConversationViewModel.swift */; };
-		69C827E8D51EB1458885425B /* Info-macOS.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5182B77A3E43F306EF7B9455 /* Info-macOS.plist */; };
 		6B9F7B68C7BA4D6875EA67CB /* AddDocumentUseCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C5569FB7585FC9F4D1D587 /* AddDocumentUseCase.swift */; };
 		6CF87C9088483BA9F8DED5E5 /* TypingIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC8B875712A32CFAD35BB72 /* TypingIndicatorView.swift */; };
 		6E3D284820A5753BDFD43F5E /* WebBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F0D4C912A9EE7F909916008 /* WebBrowserView.swift */; };
@@ -140,7 +139,6 @@
 		D2BCCB53776EAD8B3B2DD59B /* ChatRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5714864E74DB83A7122CE8D4 /* ChatRepositoryTests.swift */; };
 		D34397A172D7100EAE29493F /* SessionRepositoryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A1DD65C4EEF7ED424A4227 /* SessionRepositoryProtocol.swift */; };
 		D676566822D7DB3B4080DE98 /* CreateSessionUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A162407D05F9EB1F524B1A /* CreateSessionUseCaseTests.swift */; };
-		D7642526B134B6E787DFBFE3 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = E3BDEF6D954F3652EC904BAB /* Info.plist */; };
 		D766B013CB99984E30E73AAC /* ChatSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE639ED8465F528A493E8D4 /* ChatSidebar.swift */; };
 		D7C626F3577A3AE6FEB3D9F6 /* SessionListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C370AC38F9CE5EA3649BA44 /* SessionListViewModelTests.swift */; };
 		D8D822EB925A8AC69302572A /* GenerateTitleUseCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C6834EF1118C5B75943CCF /* GenerateTitleUseCase.swift */; };
@@ -205,7 +203,7 @@
 
 /* Begin PBXFileReference section */
 		01A844C95CD3E74D53A7027D /* DynamicLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicLogoView.swift; sourceTree = "<group>"; };
-		03B2818590ED9F9AB0B1CF47 /* letstalkAI.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = letstalkAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		03B2818590ED9F9AB0B1CF47 /* letstalkAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = letstalkAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		058DAD1C3B97E0CB2952F1AA /* letstalkAITests-macOS.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "letstalkAITests-macOS.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		073F8102F8A9E3D75FF6076D /* SpeakTextUseCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakTextUseCase.swift; sourceTree = "<group>"; };
 		0C370AC38F9CE5EA3649BA44 /* SessionListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModelTests.swift; sourceTree = "<group>"; };
@@ -252,7 +250,7 @@
 		88CF96AD73742281E760C8B6 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		893023E0E54C43ABDBEAD2E3 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
 		8D8A4A8E3865D3F7FF24BC6A /* ChatMessageDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageDTO.swift; sourceTree = "<group>"; };
-		91536B999C587D6F42503FF8 /* letstalkAI-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "letstalkAI-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		91536B999C587D6F42503FF8 /* letstalkAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = letstalkAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9180B03CBE2C9D51465AC148 /* LLMRepositoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRepositoryProtocol.swift; sourceTree = "<group>"; };
 		9996995EA6666B2A930484D0 /* ChatSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSession.swift; sourceTree = "<group>"; };
 		99988DFF74AB698829C373D1 /* SessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModel.swift; sourceTree = "<group>"; };
@@ -605,7 +603,7 @@
 		887D74307E0B2FFA411D587B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				91536B999C587D6F42503FF8 /* letstalkAI-macOS.app */,
+				91536B999C587D6F42503FF8 /* letstalkAI.app */,
 				03B2818590ED9F9AB0B1CF47 /* letstalkAI.app */,
 				7A9D4D4CE6A206FE503FF79F /* letstalkAIIntegrationTests.xctest */,
 				058DAD1C3B97E0CB2952F1AA /* letstalkAITests-macOS.xctest */,
@@ -868,7 +866,7 @@
 				4AB398EB54EEA77578FA98CC /* MarkdownUI */,
 			);
 			productName = "letstalkAI-macOS";
-			productReference = 91536B999C587D6F42503FF8 /* letstalkAI-macOS.app */;
+			productReference = 91536B999C587D6F42503FF8 /* letstalkAI.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -881,14 +879,12 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					0EE0747E6788D3DF4E36897C = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					22FFC05A7C70419937B3EBE6 = {
 						TestTargetID = 0EE0747E6788D3DF4E36897C;
 					};
 					F381C62D2565566C4D7AEF86 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -929,7 +925,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				240C23189A1F252DA94B8D74 /* Assets.xcassets in Resources */,
-				D7642526B134B6E787DFBFE3 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -938,7 +933,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				F35C4AB0E131665B3E387B99 /* Assets.xcassets in Resources */,
-				69C827E8D51EB1458885425B /* Info-macOS.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1206,7 +1200,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = QGL88Z59E8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "letstalkAI/App/Info-macOS.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1310,7 +1304,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = QGL88Z59E8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "letstalkAI/App/Info-macOS.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1365,7 +1359,8 @@
 				CODE_SIGN_ENTITLEMENTS = letstalkAI/App/letstalkAI.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = QGL88Z59E8;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = letstalkAI/App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1373,6 +1368,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.letstalkAI.app;
+				PRODUCT_NAME = letstalkAI;
 				SDKROOT = iphoneos;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1495,7 +1491,8 @@
 				CODE_SIGN_ENTITLEMENTS = letstalkAI/App/letstalkAI.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = QGL88Z59E8;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = letstalkAI/App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1503,6 +1500,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.letstalkAI.app;
+				PRODUCT_NAME = letstalkAI;
 				SDKROOT = iphoneos;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";

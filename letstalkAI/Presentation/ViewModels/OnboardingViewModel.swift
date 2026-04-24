@@ -13,6 +13,14 @@ final class OnboardingViewModel: ObservableObject {
     @Published var currentStep: Int = 0
     @Published var isComplete: Bool = false
     
+    let isFromSettings: Bool
+    private let onComplete: (() -> Void)?
+    
+    init(isFromSettings: Bool = false, onComplete: (() -> Void)? = nil) {
+        self.isFromSettings = isFromSettings
+        self.onComplete = onComplete
+    }
+    
     let steps: [OnboardingStep] = [
         OnboardingStep(
             title: "Welcome to letstalkAI",
@@ -69,9 +77,13 @@ final class OnboardingViewModel: ObservableObject {
     }
     
     private func completeOnboarding() {
-        UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
-        isComplete = true
-        NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
+        if isFromSettings {
+            onComplete?()
+        } else {
+            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+            isComplete = true
+            NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
+        }
     }
 }
 

@@ -14,4 +14,5 @@ struct ChatMessageDTO: Sendable {
     let isUser: Bool
     let timestamp: Date
     let sourcesJSON: String?
+    let imageURLsJSON: String?
 }

@@ -45,7 +45,8 @@ struct MainView: View {
                     showKnowledgeBase: $showKnowledgeBase,
                     showVoiceConversation: $showVoiceConversation,
                     showWebBrowser: $showWebBrowser,
-                    webBrowserURL: $webBrowserURL
+                    webBrowserURL: $webBrowserURL,
+                    showSettings: $showSettings
                 )
                 .offset(x: showSidebar ? sidebarWidth : 0)
                 
@@ -65,6 +66,7 @@ struct MainView: View {
                     showSettings: $showSettings,
                     isVisible: $showSidebar,
                     onSessionSelect: { session in
+                        sessionListViewModel.selectSession(session)
                         Task {
                             await chatViewModel.loadSession(session)
                             withAnimation {
@@ -142,6 +144,7 @@ struct MainView: View {
                 showSettings: $showSettings,
                 isVisible: .constant(true),
                 onSessionSelect: { session in
+                    sessionListViewModel.selectSession(session)
                     Task {
                         await chatViewModel.loadSession(session)
                     }
@@ -155,7 +158,8 @@ struct MainView: View {
                 showKnowledgeBase: $showKnowledgeBase,
                 showVoiceConversation: $showVoiceConversation,
                 showWebBrowser: $showWebBrowser,
-                webBrowserURL: $webBrowserURL
+                webBrowserURL: $webBrowserURL,
+                showSettings: $showSettings
             )
         }
         .sheet(isPresented: $showKnowledgeBase) {

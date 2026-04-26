@@ -12,6 +12,7 @@ import SwiftUI
 final class OnboardingViewModel: ObservableObject {
     @Published var currentStep: Int = 0
     @Published var isComplete: Bool = false
+    @Published var showModelSelection: Bool = false
     
     let isFromSettings: Bool
     private let onComplete: (() -> Void)?
@@ -76,7 +77,17 @@ final class OnboardingViewModel: ObservableObject {
         completeOnboarding()
     }
     
-    private func completeOnboarding() {
+    func proceedToModelSelection() {
+        withAnimation {
+            showModelSelection = true
+        }
+    }
+    
+    func skipModelSelection() {
+        completeOnboarding()
+    }
+    
+    func completeOnboarding() {
         if isFromSettings {
             onComplete?()
         } else {

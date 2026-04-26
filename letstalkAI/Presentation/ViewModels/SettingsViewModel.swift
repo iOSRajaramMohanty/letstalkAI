@@ -20,7 +20,10 @@ final class SettingsViewModel: ObservableObject {
     @Published var appVersion: String = ""
     @Published var buildNumber: String = ""
     
-    init() {
+    private let sessionRepository: SessionRepositoryProtocol
+    
+    init(sessionRepository: SessionRepositoryProtocol? = nil) {
+        self.sessionRepository = sessionRepository ?? DependencyContainer.shared.sessionRepository
         loadAppInfo()
         loadColorSchemePreference()
     }
@@ -56,6 +59,21 @@ final class SettingsViewModel: ObservableObject {
         }
     }
     
+    func deleteAllConversations() {
+        Task {
+            do {
+                let sessions = try await sessionRepository.getAllSessions()
+                for session in sessions {
+                    try await sessionRepository.deleteSession(session.id)
+                }
+                NotificationCenter.default.post(name: .conversationsDeleted, object: nil)
+                print("✅ [Settings] All conversations deleted")
+            } catch {
+                print("❌ [Settings] Failed to delete conversations: \(error)")
+            }
+        }
+    }
+    
     func openURL(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
         
@@ -80,5 +98,9 @@ final class SettingsViewModel: ObservableObject {
     
     var termsURL: String {
         "https://letstalkAI.app/terms"
+    }
+    
+    var licensesURL: String {
+        "https://letstalkAI.app/licenses"
     }
 }

@@ -86,8 +86,6 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                     return
                 }
                 
-                self.logDeviceSupport()
-                
                 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 print("🤖 [LLM] Generating response...")
                 print("   📝 Prompt length: \(prompt.count) characters")
@@ -95,6 +93,26 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 
                 self.respondingState = true
+                
+                let selectedLocalModelId = await MainActor.run {
+                    ModelDownloadManager.shared.selectedModelId
+                }
+                
+                let hasDownloadedModels = await MainActor.run {
+                    !ModelDownloadManager.shared.downloadedModels.isEmpty
+                }
+                
+                if let localModelId = selectedLocalModelId, hasDownloadedModels {
+                    print("🤖 [LLM] Using Local Model: \(localModelId)")
+                    await self.generateWithLocalModel(
+                        prompt: prompt,
+                        modelId: localModelId,
+                        continuation: continuation
+                    )
+                    return
+                }
+                
+                self.logDeviceSupport()
                 
                 #if canImport(FoundationModels)
                 if #available(iOS 26.0, macOS 26.0, *) {
@@ -120,17 +138,63 @@ final class LLMRepository: LLMRepositoryProtocol, @unchecked Sendable {
                     self.respondingState = false
                     print("❌ [LLM] OS version not supported")
                     #if os(iOS)
-                    continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence requires iOS 26 or newer."))
+                    continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence requires iOS 26 or newer. Download a local model from Settings > Manage models to use offline AI."))
                     #elseif os(macOS)
-                    continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence requires macOS 26 or newer."))
+                    continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence requires macOS 26 or newer. Download a local model from Settings > Manage models to use offline AI."))
                     #endif
                 }
                 #else
                 self.respondingState = false
                 print("❌ [LLM] FoundationModels not available on this platform")
-                continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence is not available on this device."))
+                continuation.finish(throwing: LLMError.generationFailed("Apple Intelligence is not available on this device. Download a local model from Settings > Manage models to use offline AI."))
                 #endif
             }
+        }
+    }
+    
+    @MainActor
+    private func generateWithLocalModel(
+        prompt: String,
+        modelId: String,
+        continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) async {
+        let engine = LocalLLMEngine.shared
+        
+        do {
+            if !engine.isModelLoaded || engine.currentModelId != modelId {
+                print("🤖 [LLM] Loading local model: \(modelId)")
+                try await engine.loadModel(modelId)
+            }
+            
+            let userPrefs = UserPreferencesManager.shared
+            let temperature = userPrefs.preferences.temperature.value
+            let customInstructions = userPrefs.preferences.enableCustomization ? userPrefs.preferences.customInstructions : nil
+            
+            var fullPrompt = prompt
+            if let instructions = customInstructions, !instructions.isEmpty {
+                fullPrompt = "System Instructions: \(instructions)\n\nUser Query: \(prompt)"
+            }
+            
+            print("🤖 [LLM] Generating with temperature: \(temperature)")
+            
+            let stream = try await engine.generate(
+                prompt: fullPrompt,
+                maxTokens: 1024,
+                temperature: temperature
+            )
+            
+            for try await text in stream {
+                continuation.yield(text)
+            }
+            
+            respondingState = false
+            print("✅ [LLM] Local model response complete")
+            continuation.finish()
+            
+        } catch {
+            respondingState = false
+            print("❌ [LLM] Local model generation failed: \(error.localizedDescription)")
+            continuation.finish(throwing: LLMError.generationFailed("Local model error: \(error.localizedDescription)"))
         }
     }
     

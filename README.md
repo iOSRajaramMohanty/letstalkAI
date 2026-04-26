@@ -1,21 +1,24 @@
 # letstalkAI
 
-A privacy-focused AI chat assistant for **iOS & macOS**, powered by **Apple Intelligence (FoundationModels)**. All AI processing happens on-device for maximum privacy and security.
+A privacy-focused AI chat assistant for **iOS & macOS**, powered by **Apple Intelligence** and **Local LLMs (MLX)**. All AI processing happens on-device for maximum privacy and security.
 
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS-blue.svg)](https://developer.apple.com)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
+[![MLX](https://img.shields.io/badge/MLX-Swift-orange.svg)](https://github.com/ml-explore/mlx-swift)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Features
 
 ### Core Features
-- **On-Device AI** - Powered by Apple FoundationModels, all AI processing happens locally
+- **On-Device AI** - Dual engine support: Apple Intelligence + Local LLMs (MLX)
+- **Local LLM Models** - Download and run open-source models (Llama, Qwen, Gemma) locally
 - **Cross-Platform** - Native support for both iOS and macOS
 - **RAG (Retrieval-Augmented Generation)** - Upload PDFs and documents for context-aware responses
 - **Web Search Integration** - Real-time web search using DuckDuckGo with source citations
 - **Voice Conversations** - Full speech-to-text (STT) and text-to-speech (TTS) support
 - **Multiple Chat Sessions** - Manage conversations with auto-generated titles
 - **Knowledge Base** - Build a personal knowledge base from uploaded documents
+- **Model Management** - Browse, download, and manage local LLM models
 
 ### UI/UX Features
 - **Dark/Light Mode** - System-aware theme support
@@ -47,12 +50,16 @@ A privacy-focused AI chat assistant for **iOS & macOS**, powered by **Apple Inte
 
 ### Important Notes
 
-> **Apple Intelligence is required** for full functionality. Without it:
-> - The app cannot generate AI responses
-> - Web search will show raw results without summarization
-> - Conversation memory/context is not available
+> **AI Engine Options:**
 > 
-> **Simulator Limitation**: Apple Intelligence is NOT available on iOS Simulator or macOS without Apple Silicon. You must test on a physical device with Apple Intelligence enabled.
+> | Engine | Availability | Requirements |
+> |--------|--------------|--------------|
+> | Apple Intelligence | iOS 26+, macOS 26+ | iPhone 15 Pro+, Mac M1+ with AI enabled |
+> | Local LLMs (MLX) | iOS 18+, macOS 15+ | Any Apple Silicon device |
+> 
+> **Without Apple Intelligence**, the app automatically uses **Local LLMs** if a model is downloaded.
+> 
+> **Simulator Limitation**: Both Apple Intelligence and MLX require Apple Silicon. Use a physical device for testing.
 
 ## Architecture
 
@@ -236,12 +243,60 @@ in multiple states simultaneously..."
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| LLM | Apple FoundationModels | Generate intelligent responses |
+| LLM (Cloud) | Apple FoundationModels | Generate intelligent responses |
+| LLM (Local) | MLX-Swift | Run open-source models on-device |
 | Vector DB | SVDB | Store document embeddings for RAG |
 | Database | SQLite.swift | Persist chat sessions and messages |
 | Web Search | DuckDuckGo + SwiftSoup | Fetch and parse web content |
 | Speech | SFSpeechRecognizer + AVSpeechSynthesizer | Voice input/output |
 | Embeddings | NLEmbedding | Generate text vectors for RAG |
+
+## Local LLM Models (MLX)
+
+### Supported Models
+
+| Model | Size | Recommended Device |
+|-------|------|-------------------|
+| Llama 3.2 (1B) | ~600MB | iPhone 14+, Any Mac M1+ |
+| Llama 3.2 (3B) | ~1.5GB | iPhone 15 Pro+, Mac M1+ |
+| Qwen 3.5 (0.8B) | ~500MB | iPhone 14+, Any Mac M1+ |
+| Qwen 3.5 (3B) | ~1.5GB | iPhone 15 Pro+, Mac M1+ |
+| Gemma 3 (2B) | ~1GB | iPhone 15+, Mac M1+ |
+| Phi 4 Mini | ~2GB | iPhone 15 Pro+, Mac M1+ |
+
+### How Local LLMs Work
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    YOUR DEVICE                          │
+│                                                         │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │  Model File │ →  │  MLX Engine │ →  │  Response   │  │
+│  │  (500MB-4GB)│    │ (Apple GPU) │    │  (Text)     │  │
+│  └─────────────┘    └─────────────┘    └─────────────┘  │
+│                                                         │
+│  ✅ No internet needed after download                   │
+│  ✅ Data never leaves device                            │
+│  ✅ Works in airplane mode                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Enabling Local LLMs
+
+1. Go to **Settings → Manage Models**
+2. Browse available model families (Llama, Qwen, Gemma, etc.)
+3. Download a model (one-time, requires internet)
+4. Select the model to use
+5. Chat offline with local AI!
+
+### Developer Mode
+
+For development/testing, you can use placeholder mode:
+
+1. Go to **Settings → Developer**
+2. Toggle **"Real MLX Downloads"**:
+   - **OFF** (default): Placeholder mode - instant downloads, keyword-based responses
+   - **ON**: Real MLX - downloads actual models, real AI inference
 
 ## Dependencies
 
@@ -251,6 +306,7 @@ in multiple states simultaneously..."
 | [SVDB](https://github.com/Dripfarm/SVDB) | 2.0.0+ | Vector database for RAG |
 | [SwiftSoup](https://github.com/scinfu/SwiftSoup) | 2.7.0+ | HTML parsing for web scraping |
 | [MarkdownUI](https://github.com/gonzalezreal/swift-markdown-ui) | 2.4.0+ | Markdown rendering in chat |
+| [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm) | 3.31.0+ | Local LLM inference on Apple Silicon |
 
 ## Getting Started
 
@@ -388,6 +444,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Acknowledgments
 
 - [Apple FoundationModels](https://developer.apple.com/documentation/foundationmodels) - On-device AI
+- [MLX](https://github.com/ml-explore/mlx) - Apple's machine learning framework
+- [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm) - Swift LLM inference
 - [SVDB](https://github.com/Dripfarm/SVDB) - Vector database
 - [SwiftSoup](https://github.com/scinfu/SwiftSoup) - HTML parsing
 - [MarkdownUI](https://github.com/gonzalezreal/swift-markdown-ui) - Markdown rendering
+- [Hugging Face](https://huggingface.co/mlx-community) - MLX model repository

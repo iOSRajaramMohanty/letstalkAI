@@ -119,6 +119,12 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
         query: String,
         session: ChatSession
     ) async throws -> (prompt: String, sources: [WebSearchResult]?, imageURLs: [URL]?) {
+        // Check for greetings/casual chat first - skip web search for these
+        if isGreetingOrCasualChat(query: query) {
+            print("👋 [Chat] Detected greeting/casual chat - skipping web search")
+            return (buildGreetingOrCasualPrompt(query: query), nil, nil)
+        }
+        
         if session.useWebSearch {
             let (prompt, sources) = try await buildWebSearchPrompt(query: query, session: session)
             return (prompt, sources, nil)
@@ -132,6 +138,60 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
         return (buildGeneralPrompt(query: query), nil, nil)
     }
     
+    /// Detects if the query is a simple greeting or casual chat
+    private func isGreetingOrCasualChat(query: String) -> Bool {
+        let q = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        let greetings = ["hi", "hello", "hey", "hola", "namaste", "good morning", "good afternoon", 
+                         "good evening", "howdy", "sup", "what's up", "whats up", "yo", "hii", "hiii",
+                         "hi there", "hello there", "hey there"]
+        
+        let casualPhrases = ["how are you", "how r u", "how're you", "thank you", "thanks", 
+                             "bye", "goodbye", "see you", "nice to meet", "who are you", 
+                             "what's your name", "what is your name", "what can you do"]
+        
+        // Exact match for short greetings
+        if greetings.contains(q) {
+            return true
+        }
+        
+        // Prefix match (e.g., "hi!" or "hello, how are you")
+        for greeting in greetings {
+            if q.hasPrefix(greeting + " ") || q.hasPrefix(greeting + "!") || 
+               q.hasPrefix(greeting + ",") || q.hasPrefix(greeting + ".") {
+                return true
+            }
+        }
+        
+        // Contains casual phrases
+        for phrase in casualPhrases {
+            if q.contains(phrase) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    /// Builds a prompt for greetings and casual conversation
+    private func buildGreetingOrCasualPrompt(query: String) -> String {
+        return """
+        You are a friendly AI assistant. Respond naturally and warmly to the user.
+        
+        RULES:
+        - Be friendly, warm, and conversational
+        - Keep responses brief (1-3 sentences)
+        - If greeted, greet back and offer to help
+        - If asked who you are, say you're a helpful AI assistant
+        - Do NOT search for information or provide facts
+        - Just have a natural conversation
+        
+        User says: \(query)
+        
+        Your friendly response:
+        """
+    }
+    
     private func buildWebSearchPrompt(
         query: String,
         session: ChatSession
@@ -142,37 +202,66 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
             throw LLMError.generationFailed("No web search results found for your query.")
         }
         
-        try await ragRepository.loadCollection(name: session.collectionName)
+        // Try to use RAG for better context selection, fallback to raw results if embedding fails
+        var semanticContext: String
         
-        for result in results {
-            let chunks = webSearchRepository.chunkText(result.content, maxLength: 1000, overlapTokens: 100)
-            for chunk in chunks {
-                try await ragRepository.addEntry(chunk, collectionName: session.collectionName)
+        do {
+            try await ragRepository.loadCollection(name: session.collectionName)
+            
+            for result in results {
+                let chunks = webSearchRepository.chunkText(result.content, maxLength: 1000, overlapTokens: 100)
+                for chunk in chunks {
+                    try await ragRepository.addEntry(chunk, collectionName: session.collectionName)
+                }
             }
+            
+            let neighbors = try await ragRepository.findNeighbors(
+                query: query,
+                collectionName: session.collectionName,
+                count: 3
+            )
+            
+            let maxContextLength = 1500
+            semanticContext = neighbors.map { neighbor -> String in
+                let text = neighbor.text
+                if text.count > maxContextLength {
+                    return String(text.prefix(maxContextLength)) + "..."
+                }
+                return text
+            }.joined(separator: "\n")
+            
+            print("🌐 [Web] Using RAG context: \(semanticContext.count) characters")
+            
+        } catch {
+            // Fallback: Use raw web results directly without RAG
+            print("⚠️ [Web] RAG failed (\(error.localizedDescription)), using raw web results")
+            
+            let maxContentLength = 1000
+            semanticContext = results.prefix(3).map { result -> String in
+                let content = result.content.prefix(maxContentLength)
+                return "**\(result.title)**\n\(content)\(result.content.count > maxContentLength ? "..." : "")"
+            }.joined(separator: "\n\n")
+            
+            print("🌐 [Web] Using raw context: \(semanticContext.count) characters")
         }
         
-        let neighbors = try await ragRepository.findNeighbors(
-            query: query,
-            collectionName: session.collectionName,
-            count: 1
-        )
-        
-        let maxContextLength = 800
-        let semanticContext = neighbors.map { neighbor -> String in
-            let text = neighbor.text
-            if text.count > maxContextLength {
-                return String(text.prefix(maxContextLength)) + "..."
-            }
-            return text
-        }.joined(separator: "\n")
-        
-        print("🌐 [Web] Context length: \(semanticContext.count) characters")
-        
         let prompt = """
-        Context: \(semanticContext)
+        You are a helpful AI assistant with access to real-time web search results.
         
-        Q: \(query)
-        A:
+        IMPORTANT INSTRUCTIONS:
+        - Answer the user's question using ONLY the web search results provided below
+        - The web search was performed just now, so this information is current and up-to-date
+        - Do NOT say you don't have real-time information - you DO have it from the web search below
+        - Do NOT say you were trained until a certain date - use the web context provided
+        - If the web results contain the answer, provide it directly and confidently
+        - Be concise and helpful
+        
+        WEB SEARCH RESULTS (current as of today):
+        \(semanticContext)
+        
+        User's Question: \(query)
+        
+        Your answer based on the web search results above:
         """
         
         print("📝 [Web] Final prompt length: \(prompt.count) characters")
@@ -194,13 +283,11 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
         
         let maxContextLength = 2500
         var pageIndices: Set<Int> = []
-        var hasImagePageMatch = false
         
         let contextItems = neighbors.map { neighbor -> String in
             let text = neighbor.text
             
             if text.contains("[Image Page") {
-                hasImagePageMatch = true
                 let imagePageIndices = extractImagePageIndices(from: text)
                 pageIndices.formUnion(imagePageIndices)
             }
@@ -297,17 +384,66 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
         }
         
         if imageDescriptions.isEmpty && !selectedImages.isEmpty {
-            imageDescriptions = "- Vehicle images from document\n"
+            imageDescriptions = "- Images from the uploaded document\n"
+        }
+        
+        let hasEntityMismatch = detectEntityMismatch(query: query, context: contextItems)
+        
+        if hasEntityMismatch {
+            print("⚠️ [RAG] Entity mismatch detected - hiding document images")
+            imageURLs = []
         }
         
         let queryType = detectQueryType(query)
-        let hasImages = !imageURLs.isEmpty
-        let prompt = buildSmartPrompt(query: query, context: contextItems, imageDescriptions: imageDescriptions, queryType: queryType, hasImages: hasImages)
+        let isVisualQuery = isQueryVisual(query: query)
+        
+        if !isVisualQuery {
+            print("📝 [RAG] Non-visual query detected - hiding images (query: '\(query)')")
+            imageURLs = []
+        }
+        
+        let hasImages = !imageURLs.isEmpty && !hasEntityMismatch && isVisualQuery
+        let documentNames = documents.map { $0.name }.joined(separator: ", ")
+        let prompt = buildSmartPrompt(query: query, context: contextItems, imageDescriptions: (hasEntityMismatch || !isVisualQuery) ? "" : imageDescriptions, queryType: queryType, hasImages: hasImages, documentName: documentNames)
         
         print("📝 [RAG] Final prompt length: \(prompt.count) characters")
-        print("🖼️ [RAG] Images will be displayed: \(hasImages ? "YES (\(imageURLs.count))" : "NO")")
+        print("🖼️ [RAG] Images will be displayed: \(hasImages ? "YES (\(imageURLs.count))" : "NO (visual query: \(isVisualQuery))")")
         
         return (prompt, nil, imageURLs.isEmpty ? nil : imageURLs)
+    }
+    
+    /// Detects if user is asking about a specific entity (brand, product, name) not present in the document
+    private func detectEntityMismatch(query: String, context: String) -> Bool {
+        let contextLower = context.lowercased()
+        
+        // Extract capitalized proper nouns from query (potential entity names)
+        let properNounPattern = try? NSRegularExpression(pattern: "\\b[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*\\b", options: [])
+        var queryEntities: [String] = []
+        
+        if let regex = properNounPattern {
+            let matches = regex.matches(in: query, options: [], range: NSRange(query.startIndex..., in: query))
+            for match in matches {
+                if let range = Range(match.range, in: query) {
+                    let entity = String(query[range]).lowercased()
+                    // Skip common words that might be capitalized at sentence start
+                    let skipWords = Set(["the", "this", "that", "what", "how", "can", "show", "tell", "please", "give", "find", "does", "about", "where", "when", "which", "who", "why"])
+                    if entity.count > 2 && !skipWords.contains(entity) {
+                        queryEntities.append(entity)
+                    }
+                }
+            }
+        }
+        
+        // Check if query entities exist in document context
+        for entity in queryEntities {
+            if !contextLower.contains(entity) {
+                // Entity mentioned in query but not in document
+                print("⚠️ [RAG] User asked about '\(entity)' but it's not found in the document context")
+                return true
+            }
+        }
+        
+        return false
     }
     
     private enum QueryType {
@@ -326,25 +462,273 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
         return .general
     }
     
-    private func buildSmartPrompt(query: String, context: String, imageDescriptions: String, queryType: QueryType, hasImages: Bool) -> String {
-        var prompt = ""
+    /// Determines if user query is asking for visual/image content
+    private func isQueryVisual(query: String) -> Bool {
+        let q = query.lowercased()
         
-        if !context.isEmpty {
-            prompt += "Context: \(context)\n\n"
+        // Generic non-visual keywords (text/data focused queries)
+        let nonVisualKeywords = [
+            // Pricing & numbers
+            "price", "cost", "how much", "₹", "$", "rs", "inr", "amount", "total", "fee",
+            // Specifications & details
+            "specification", "spec", "list", "number", "quantity", "count",
+            // Text content
+            "summary", "summarize", "overview", "explain", "what is", "define", "meaning",
+            "describe", "description", "detail", "information", "info",
+            // Questions about facts
+            "when", "where", "why", "who", "which",
+            // Instructions & processes
+            "step", "procedure", "process", "instruction", "guide", "how to",
+            // Documents & text
+            "term", "clause", "condition", "agreement", "contract", "section",
+            "paragraph", "chapter", "page", "content", "text",
+            // Transactions
+            "invoice", "bill", "payment", "receipt", "order",
+            // Comparisons
+            "compare", "comparison", "vs", "versus", "difference", "between"
+        ]
+        
+        for keyword in nonVisualKeywords {
+            if q.contains(keyword) {
+                return false
+            }
         }
         
+        // Generic visual keywords (asking to see something)
+        let visualKeywords = [
+            // Direct visual requests
+            "show", "show me", "display", "view",
+            // Appearance related
+            "look", "looks", "looking", "appear", "appearance",
+            // Image references
+            "see", "image", "photo", "picture", "diagram", "figure", "chart", "graph",
+            "illustration", "screenshot", "visual",
+            // Design/style
+            "design", "style", "color", "colour", "shape", "layout",
+            // Position/view
+            "front", "back", "side", "top", "bottom",
+            // Phrases
+            "what does it look", "how does it look", "can i see"
+        ]
+        
+        for keyword in visualKeywords {
+            if q.contains(keyword) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    private func buildSmartPrompt(query: String, context: String, imageDescriptions: String, queryType: QueryType, hasImages: Bool, documentName: String = "") -> String {
+        let conversationType = detectConversationType(query: query, context: context)
+        
+        switch conversationType {
+        case .greeting:
+            return buildGreetingPrompt(query: query, documentName: documentName)
+        case .casualChat:
+            return buildCasualChatPrompt(query: query)
+        case .documentRelated:
+            return buildDocumentPrompt(query: query, context: context, imageDescriptions: imageDescriptions, hasImages: hasImages, documentName: documentName)
+        case .unrelated:
+            return buildUnrelatedPrompt(query: query, context: context, documentName: documentName)
+        }
+    }
+    
+    private enum ConversationType {
+        case greeting
+        case casualChat
+        case documentRelated
+        case unrelated
+    }
+    
+    private func detectConversationType(query: String, context: String) -> ConversationType {
+        let q = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Detect greetings
+        let greetings = ["hi", "hello", "hey", "hola", "namaste", "good morning", "good afternoon", "good evening", "howdy", "sup", "what's up", "whats up"]
+        if greetings.contains(q) || greetings.contains(where: { q.hasPrefix($0 + " ") || q.hasPrefix($0 + "!") || q.hasPrefix($0 + ",") }) {
+            return .greeting
+        }
+        
+        // Detect casual chat (how are you, thanks, etc.)
+        let casualPhrases = ["how are you", "thank you", "thanks", "bye", "goodbye", "see you", "nice to meet", "who are you", "what's your name", "what is your name"]
+        if casualPhrases.contains(where: { q.contains($0) }) {
+            return .casualChat
+        }
+        
+        // Check if query seems related to document context
+        let contextLower = context.lowercased()
+        let queryWords = q.split(separator: " ").map(String.init).filter { $0.count > 2 }
+        let stopWords = Set(["the", "and", "for", "are", "what", "how", "can", "you", "tell", "about", "this", "that", "with", "from"])
+        let meaningfulWords = queryWords.filter { !stopWords.contains($0) }
+        
+        // Check if any meaningful query words appear in context
+        let hasContextMatch = meaningfulWords.contains { word in
+            contextLower.contains(word)
+        }
+        
+        // Also check for document-related intent words
+        let documentIntentWords = ["document", "pdf", "file", "uploaded", "attached", "show", "explain", "summarize", "tell me about"]
+        let hasDocumentIntent = documentIntentWords.contains(where: { q.contains($0) })
+        
+        if hasContextMatch || hasDocumentIntent {
+            return .documentRelated
+        }
+        
+        return .unrelated
+    }
+    
+    private func buildGreetingPrompt(query: String, documentName: String) -> String {
+        let docMention = documentName.isEmpty ? "" : " I see you have \"\(documentName)\" ready - feel free to ask me anything about it!"
+        
+        return """
+        You are a friendly AI assistant. The user is greeting you. Respond warmly and naturally like a helpful human would.
+        
+        IMPORTANT RULES:
+        - Be warm, friendly, and conversational
+        - Introduce yourself briefly as a helpful assistant
+        - Ask how you can help them today
+        - If there's a document, briefly mention you can help with it\(docMention.isEmpty ? "" : " (document: \(documentName))")
+        - Keep the response short and natural (2-3 sentences max)
+        
+        User says: \(query)
+        
+        Your friendly response:
+        """
+    }
+    
+    private func buildCasualChatPrompt(query: String) -> String {
+        return """
+        You are a friendly AI assistant having a casual conversation. Respond naturally and warmly.
+        
+        IMPORTANT RULES:
+        - Be conversational and friendly
+        - Keep responses natural and brief
+        - If asked who you are, say you're a helpful AI assistant
+        - Do NOT mention documents unless the user asks about them
+        
+        User says: \(query)
+        
+        Your response:
+        """
+    }
+    
+    private func buildDocumentPrompt(query: String, context: String, imageDescriptions: String, hasImages: Bool, documentName: String = "") -> String {
+        var prompt = """
+        You are a helpful AI assistant. Answer the user's question based ONLY on the provided document context.
+        
+        Document Context:
+        \(context)
+        
+        """
+        
         if hasImages {
-            prompt += "IMAGES ARE DISPLAYED TO USER. You MUST acknowledge them.\n"
+            prompt += "IMAGES ARE DISPLAYED TO USER. Acknowledge what you see.\n"
             if !imageDescriptions.isEmpty {
                 prompt += "Image content: \(imageDescriptions)\n"
             }
-            prompt += "Describe what is shown in a helpful way.\n\n"
         }
         
-        prompt += "User asks: \(query)\n"
-        prompt += "Your response (acknowledge images if shown):"
+        prompt += """
+        
+        IMPORTANT RULES:
+        - Answer based ONLY on the document context above
+        - Be helpful and conversational
+        - If asked to show images, describe what's in the document
+        - Be concise but thorough
+        
+        User asks: \(query)
+        
+        Your helpful response:
+        """
         
         return prompt
+    }
+    
+    private func buildUnrelatedPrompt(query: String, context: String, documentName: String = "") -> String {
+        // Use document name if available, otherwise extract topic from context
+        let documentTopic: String
+        if !documentName.isEmpty {
+            documentTopic = documentName
+        } else {
+            documentTopic = extractDocumentTopic(from: context)
+        }
+        
+        return """
+        You are a helpful AI assistant. The user has uploaded a document: "\(documentTopic)".
+        However, their question seems to be about a different topic.
+        
+        IMPORTANT RULES:
+        - Politely acknowledge their question
+        - Explain that you can only help with questions about the uploaded document
+        - Briefly mention the document name/topic
+        - Offer to help with questions related to "\(documentTopic)"
+        - Be friendly and conversational, not robotic
+        - Keep response to 2-3 sentences
+        
+        User asks: \(query)
+        
+        Your polite response:
+        """
+    }
+    
+    private func extractDocumentTopic(from context: String) -> String {
+        // Extract meaningful words from context to understand what it's about
+        let contextLower = context.lowercased()
+        
+        // Extract the most frequent meaningful words/phrases from context
+        let words = contextLower.components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count > 3 }
+        
+        // Count word frequency
+        var wordCounts: [String: Int] = [:]
+        let stopWords = Set(["this", "that", "with", "from", "have", "been", "were", "will", "your", "about", "more", "some", "what", "when", "where", "which", "their", "there", "would", "could", "should", "these", "those", "than", "them", "then", "into", "also", "only", "other", "over", "such", "through", "very", "just", "being", "here", "after", "before", "each", "made", "make", "like", "back", "even", "most", "well", "much", "same", "does", "image", "page", "text", "document", "file"])
+        
+        for word in words {
+            if !stopWords.contains(word) && word.count > 3 {
+                wordCounts[word, default: 0] += 1
+            }
+        }
+        
+        // Get top keywords
+        let topKeywords = wordCounts.sorted { $0.value > $1.value }
+            .prefix(5)
+            .map { $0.key }
+        
+        // Look for product names (capitalized words that appear frequently)
+        let capitalizedPattern = try? NSRegularExpression(pattern: "\\b[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*\\b", options: [])
+        var productNames: [String] = []
+        if let regex = capitalizedPattern {
+            let matches = regex.matches(in: context, options: [], range: NSRange(context.startIndex..., in: context))
+            for match in matches.prefix(20) {
+                if let range = Range(match.range, in: context) {
+                    let name = String(context[range])
+                    if name.count > 2 && !["The", "This", "That", "And", "For", "With", "From", "Are", "Was", "Were", "Has", "Have", "Page", "Image"].contains(name) {
+                        productNames.append(name)
+                    }
+                }
+            }
+        }
+        
+        // Count product name occurrences
+        var productCounts: [String: Int] = [:]
+        for name in productNames {
+            productCounts[name, default: 0] += 1
+        }
+        
+        // Get most frequent product/brand name
+        if let topProduct = productCounts.sorted(by: { $0.value > $1.value }).first, topProduct.value >= 2 {
+            return topProduct.key
+        }
+        
+        // Build topic description from top keywords
+        if !topKeywords.isEmpty {
+            let keywordList = topKeywords.prefix(3).joined(separator: ", ")
+            return "topics related to: \(keywordList)"
+        }
+        
+        return "the uploaded document"
     }
     
     private func selectDiverseImages(from candidates: [(image: DocumentImage, score: Int)], query: String) -> [(image: DocumentImage, score: Int)] {
@@ -432,104 +816,104 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
         return selectedImages
     }
     
-    private func detectSpecificFeature(query: String) -> String? {
-        let featureKeywords: [String: [String]] = [
-            "seat": ["seat", "seats", "seating"],
-            "dashboard": ["dashboard", "dash"],
-            "steering": ["steering", "wheel controls"],
-            "gauge": ["gauge", "gauges", "speedometer", "instrument", "cluster"],
-            "wheel": ["wheel", "wheels", "rim", "rims", "alloy"],
-            "headlight": ["headlight", "headlights", "lamp", "lights"],
-            "bumper": ["bumper", "front bumper", "rear bumper"],
-            "grille": ["grille", "grill", "front grille"],
-            "trunk": ["trunk", "boot", "cargo"]
-        ]
+    /// Extracts meaningful keywords from the query that can be matched against image labels
+    private func extractQueryKeywords(query: String) -> [String] {
+        let q = query.lowercased()
+        let stopWords = Set(["the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+                             "have", "has", "had", "do", "does", "did", "will", "would", "could",
+                             "should", "may", "might", "must", "shall", "can", "need", "dare",
+                             "show", "me", "see", "display", "view", "look", "looking", "find",
+                             "what", "how", "where", "when", "which", "who", "why", "this", "that",
+                             "with", "from", "about", "into", "through", "during", "before", "after"])
         
-        for (feature, keywords) in featureKeywords {
-            if keywords.contains(where: { query.contains($0) }) {
-                return feature
-            }
-        }
-        return nil
+        let words = q.components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count > 2 && !stopWords.contains($0) }
+        
+        return words
     }
     
-    private func hasFeatureLabel(_ image: DocumentImage, feature: String) -> Bool {
+    /// Checks if image labels or OCR text match the query keywords
+    private func imageMatchesQuery(_ image: DocumentImage, queryKeywords: [String]) -> Bool {
+        guard !queryKeywords.isEmpty else { return false }
+        
         let labelsLower = image.classificationLabels.map { $0.lowercased() }
+        let ocrLower = image.ocrText.lowercased()
         
-        let featureLabelMap: [String: [String]] = [
-            "seat": ["seat", "chair", "leather", "upholstery", "fabric", "cushion"],
-            "dashboard": ["dashboard", "console", "control panel", "display"],
-            "steering": ["steering wheel", "steering"],
-            "gauge": ["gauge", "speedometer", "instrument", "dial", "meter"],
-            "wheel": ["tire", "rim", "alloy", "rubber"],
-            "headlight": ["headlight", "lamp", "light"],
-            "bumper": ["bumper"],
-            "grille": ["grille", "grill"],
-            "trunk": ["trunk", "cargo", "boot"]
-        ]
-        
-        let featureExcludeMap: [String: [String]] = [
-            "wheel": ["engine", "motor", "gear", "piston", "cylinder", "mechanical", "diagram", "cutaway"],
-            "steering": ["engine", "motor"]
-        ]
-        
-        if let excludeLabels = featureExcludeMap[feature] {
-            let hasExcluded = labelsLower.contains { label in
-                excludeLabels.contains { label.contains($0) }
+        // Check if any query keyword matches image content
+        for keyword in queryKeywords {
+            // Check labels
+            if labelsLower.contains(where: { $0.contains(keyword) }) {
+                return true
             }
-            if hasExcluded {
-                return false
-            }
-            
-            let ocrLower = image.ocrText.lowercased()
-            let hasExcludedOCR = excludeLabels.contains { ocrLower.contains($0) }
-            if hasExcludedOCR {
-                return false
+            // Check OCR text
+            if ocrLower.contains(keyword) {
+                return true
             }
         }
         
-        guard let matchLabels = featureLabelMap[feature] else { return false }
-        
-        return labelsLower.contains { label in
-            matchLabels.contains { label.contains($0) }
-        }
+        return false
     }
     
-    private func isInteriorImage(_ image: DocumentImage) -> Bool {
+    /// Generic image type categorization
+    private enum ImageType {
+        case photo       // Real photographs
+        case diagram     // Technical diagrams, flowcharts
+        case chart       // Data charts, graphs
+        case icon        // Small icons, logos
+        case screenshot  // UI screenshots
+        case unknown
+    }
+    
+    /// Determines the general type/category of an image
+    private func detectImageType(_ image: DocumentImage) -> ImageType {
         let labelsLower = image.classificationLabels.map { $0.lowercased() }
-        let exteriorIndicators = ["outdoor", "sky", "land", "building", "tree", "road", "street"]
+        let ocrLower = image.ocrText.lowercased()
         
-        let hasExteriorIndicator = labelsLower.contains { label in
-            exteriorIndicators.contains { label.contains($0) }
+        // Check for charts/graphs
+        let chartIndicators = ["chart", "graph", "bar", "pie", "line chart", "data", "axis", "legend"]
+        if chartIndicators.contains(where: { labelsLower.joined().contains($0) || ocrLower.contains($0) }) {
+            return .chart
         }
         
-        if hasExteriorIndicator {
+        // Check for diagrams
+        let diagramIndicators = ["diagram", "flowchart", "schematic", "blueprint", "technical", "architecture", "flow"]
+        if diagramIndicators.contains(where: { labelsLower.joined().contains($0) || ocrLower.contains($0) }) {
+            return .diagram
+        }
+        
+        // Check for screenshots
+        let screenshotIndicators = ["screenshot", "screen", "ui", "interface", "app", "window", "button", "menu"]
+        if screenshotIndicators.contains(where: { labelsLower.joined().contains($0) }) {
+            return .screenshot
+        }
+        
+        // Check for icons/logos (usually small images with minimal labels)
+        if image.classificationLabels.count <= 2 && labelsLower.contains(where: { $0.contains("logo") || $0.contains("icon") || $0.contains("symbol") }) {
+            return .icon
+        }
+        
+        // Default to photo for images with object labels
+        let photoIndicators = ["person", "people", "building", "outdoor", "indoor", "product", "object", "nature", "animal"]
+        if photoIndicators.contains(where: { labelsLower.joined().contains($0) }) {
+            return .photo
+        }
+        
+        return .unknown
+    }
+    
+    /// Checks if image appears to be a meaningful content image (not decorative)
+    private func isContentImage(_ image: DocumentImage) -> Bool {
+        // Skip very small classification label sets (might be decorative)
+        if image.classificationLabels.isEmpty {
             return false
         }
         
-        let interiorLabels = ["dashboard", "steering wheel", "seat", "cockpit", "cabin", "gauge", "speedometer", "console", "interior", "control panel", "leather", "fabric", "button", "display", "screen", "panel"]
-        
-        return labelsLower.contains { label in
-            interiorLabels.contains { label.contains($0) }
-        }
-    }
-    
-    private func isExteriorImage(_ image: DocumentImage) -> Bool {
-        let labelsLower = image.classificationLabels.map { $0.lowercased() }
-        let interiorLabels = ["dashboard", "steering wheel", "seat", "cockpit", "cabin", "gauge", "speedometer", "console", "interior", "leather", "panel", "display", "button"]
-        let exteriorLabels = ["car", "vehicle", "automobile", "sedan", "suv", "outdoor", "wheel", "rim", "tire", "bumper", "headlight", "sky", "road", "land"]
-        
-        let hasInterior = labelsLower.contains { label in
-            interiorLabels.contains { label.contains($0) }
-        }
-        
-        if hasInterior {
+        // Skip images that are likely QR codes or barcodes
+        if isQRCodeOrIrrelevant(image) {
             return false
         }
         
-        return labelsLower.contains { label in
-            exteriorLabels.contains { label.contains($0) }
-        }
+        return true
     }
     
     private func isQRCodeOrIrrelevant(_ image: DocumentImage) -> Bool {
@@ -698,37 +1082,6 @@ final class SendMessageUseCase: SendMessageUseCaseProtocol, @unchecked Sendable 
         return "Image showing: \(topLabels)"
     }
     
-    private func getSemanticDescriptionOld(labels: [String]) -> String {
-        let labelsLower = labels.map { $0.lowercased() }
-        
-        let interiorLabels = ["dashboard", "steering wheel", "seat", "cockpit", "cabin", "gauge", "speedometer", "console"]
-        let exteriorLabels = ["car", "vehicle", "automobile", "sedan", "suv", "outdoor"]
-        let wheelLabels = ["wheel", "tire", "rim", "alloy"]
-        
-        let hasInterior = labelsLower.contains { label in
-            interiorLabels.contains { label.contains($0) }
-        }
-        
-        let hasExterior = labelsLower.contains { label in
-            exteriorLabels.contains { label.contains($0) }
-        }
-        
-        let hasWheel = labelsLower.contains { label in
-            wheelLabels.contains { label.contains($0) }
-        }
-        
-        if hasInterior {
-            return "Interior view showing dashboard/cabin"
-        } else if hasWheel {
-            return "Close-up of wheel/rim design"
-        } else if hasExterior {
-            return "Exterior view of the vehicle"
-        } else if !labels.isEmpty {
-            return "Image: \(labels.prefix(3).joined(separator: ", "))"
-        }
-        
-        return ""
-    }
     
     private func extractImagePageIndices(from text: String) -> Set<Int> {
         var indices: Set<Int> = []
